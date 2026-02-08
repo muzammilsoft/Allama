@@ -1,0 +1,2 @@
+# Aallama
+واجهة استخدام Ollama 
