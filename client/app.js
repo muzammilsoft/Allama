@@ -1,0 +1,268 @@
+let currentSessionId = null;
+let currentMessages = [];
+let models = [];
+let settings = {
+    systemPrompt: 'أنت مساعد ذكي ومتعاون، تدعى "علّامة". تجيب باللغة العربية بشكل افتراضي.',
+    temperature: 0.7,
+    toolsEnabled: true
+};
+let selectedImageBase64 = null;
+let isDarkMode = false;
+
+const chatMessages = document.getElementById('chat-messages');
+const userInput = document.getElementById('user-input');
+const modelSelect = document.getElementById('model-select');
+const sessionList = document.getElementById('session-list');
+const sidebar = document.getElementById('sidebar');
+const imagePreview = document.getElementById('image-preview');
+const previewImg = document.getElementById('preview-img');
+const sendBtn = document.getElementById('send-btn');
+const imageBtn = document.getElementById('image-btn');
+const tempRange = document.getElementById('temp-range');
+const tempVal = document.getElementById('temp-val');
+
+async function init() {
+    loadSettings();
+    applyDarkMode();
+    await fetchModels();
+    await fetchSessions();
+    userInput.addEventListener('input', autoResizeTextarea);
+    userInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+    });
+    tempRange.addEventListener('input', (e) => { tempVal.textContent = e.target.value; });
+    modelSelect.addEventListener('change', checkVisionSupport);
+}
+
+async function fetchModels() {
+    try {
+        const res = await fetch('/api/models');
+        const data = await res.json();
+        models = data.models || [];
+        renderModelSelect();
+    } catch (err) { console.error('Error fetching models:', err); }
+}
+
+function renderModelSelect() {
+    modelSelect.innerHTML = models.map(m => `<option value="${m.name}">${m.name} (${(m.size / (1024*1024*1024)).toFixed(1)} GB)</option>`).join('') + '<option value="custom">إضافة نموذج آخر...</option>';
+    const defaultModels = ['gemma3:latest', 'qwen2.5:latest', 'llama3:latest'];
+    for (const def of defaultModels) {
+        if (models.find(m => m.name === def)) { modelSelect.value = def; break; }
+    }
+    checkVisionSupport();
+}
+
+async function fetchSessions() {
+    try {
+        const res = await fetch('/api/sessions');
+        const data = await res.json();
+        renderSessionList(data);
+    } catch (err) { console.error('Error fetching sessions:', err); }
+}
+
+function renderSessionList(sessions) {
+    sessionList.innerHTML = sessions.map(s => `
+        <div class="flex items-center group">
+            <button onclick="loadSession('${s.id}')" class="flex-1 text-right p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 truncate ${currentSessionId === s.id ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : ''}">
+                <i class="far fa-comment-alt ml-2"></i> ${s.title || 'محادثة جديدة'}
+            </button>
+            <button onclick="deleteSession('${s.id}')" class="p-3 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><i class="fas fa-trash"></i></button>
+        </div>
+    `).join('');
+}
+
+async function newChat() {
+    currentSessionId = 'session_' + Date.now();
+    currentMessages = [];
+    renderMessages();
+    await fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: currentSessionId, title: 'محادثة جديدة' })
+    });
+    await fetchSessions();
+    toggleSidebar(false);
+}
+
+async function loadSession(id) {
+    currentSessionId = id;
+    const res = await fetch(`/api/sessions/${id}/messages`);
+    currentMessages = await res.json();
+    renderMessages();
+    await fetchSessions();
+    toggleSidebar(false);
+}
+
+async function deleteSession(id) {
+    if (!confirm('هل أنت متأكد من حذف هذه المحادثة؟')) return;
+    await fetch(`/api/sessions/${id}`, { method: 'DELETE' });
+    if (currentSessionId === id) { currentSessionId = null; currentMessages = []; renderMessages(); }
+    await fetchSessions();
+}
+
+async function sendMessage() {
+    const text = userInput.value.trim();
+    if (!text && !selectedImageBase64) return;
+    if (!currentSessionId) await newChat();
+
+    const userMsg = {
+        role: 'user',
+        content: text,
+        images: selectedImageBase64 ? [selectedImageBase64.split(',')[1]] : null
+    };
+
+    currentMessages.push({ ...userMsg, content: text, images: selectedImageBase64 ? [selectedImageBase64] : null });
+    renderMessages();
+    userInput.value = '';
+    autoResizeTextarea();
+    removeImage();
+
+    await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: currentSessionId, role: 'user', content: text, images: userMsg.images ? JSON.stringify(userMsg.images) : null })
+    });
+
+    if (currentMessages.length === 1 || (currentMessages.length === 2 && currentMessages[0].role === 'user')) {
+        const title = text.substring(0, 30) + (text.length > 30 ? '...' : '');
+        await fetch(`/api/sessions/${currentSessionId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }) });
+        await fetchSessions();
+    }
+
+    try {
+        sendBtn.disabled = true;
+        const messagesForApi = [];
+        if (settings.systemPrompt) messagesForApi.push({ role: 'system', content: settings.systemPrompt });
+        const history = currentMessages.map(m => ({
+            role: m.role,
+            content: m.content,
+            images: m.images ? (typeof m.images === 'string' ? JSON.parse(m.images) : m.images.map(img => img.includes(',') ? img.split(',')[1] : img)) : undefined
+        }));
+        messagesForApi.push(...history);
+
+        const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId: currentSessionId, model: modelSelect.value, messages: messagesForApi, options: { temperature: parseFloat(settings.temperature) }, toolsEnabled: settings.toolsEnabled })
+        });
+        const data = await res.json();
+        if (data.message) { currentMessages.push(data.message); renderMessages(); }
+    } catch (err) { console.error('Chat error:', err); appendErrorMessage('عذراً، حدث خطأ أثناء الاتصال بالنموذج.'); }
+    finally { sendBtn.disabled = false; }
+}
+
+function renderMessages() {
+    if (currentMessages.length === 0) {
+        chatMessages.innerHTML = `<div class="flex justify-center items-center h-full text-gray-400"><div class="text-center"><i class="fas fa-robot text-6xl mb-4"></i><p class="text-xl">ابدأ محادثة جديدة مع علّامة</p></div></div>`;
+        return;
+    }
+    chatMessages.innerHTML = currentMessages.map(msg => {
+        if (msg.role === 'tool') return '';
+        const isUser = msg.role === 'user';
+        let imagesHtml = '';
+        if (msg.images) {
+            const imgs = typeof msg.images === 'string' ? JSON.parse(msg.images) : msg.images;
+            imagesHtml = `<div class="flex gap-2 mb-2">${imgs.map(img => `<img src="${img.startsWith('data:') ? img : 'data:image/jpeg;base64,' + img}" class="h-32 rounded shadow-sm">`).join('')}</div>`;
+        }
+        return `
+            <div class="flex ${isUser ? 'justify-start' : 'justify-end'}">
+                <div class="max-w-[85%] ${isUser ? 'bg-blue-600 text-white rounded-t-2xl rounded-bl-2xl' : 'bg-white text-gray-900 border border-gray-200 rounded-t-2xl rounded-br-2xl shadow-sm'} p-4">
+                    ${imagesHtml}
+                    <div class="markdown-content ${!isUser ? 'text-gray-800' : ''}">
+                        ${isUser ? escapeHtml(msg.content) : DOMPurify.sanitize(marked.parse(msg.content))}
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    document.querySelectorAll('pre code').forEach((el) => hljs.highlightElement(el));
+}
+
+function appendErrorMessage(text) {
+    chatMessages.innerHTML += `<div class="flex justify-start"><div class="max-w-[85%] bg-red-50 text-red-600 border border-red-200 rounded-t-2xl rounded-bl-2xl p-4">${text}</div></div>`;
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function toggleSidebar(show) {
+    if (show === undefined) sidebar.classList.toggle('translate-x-full');
+    else if (show) sidebar.classList.remove('translate-x-full');
+    else sidebar.classList.add('translate-x-full');
+}
+
+function autoResizeTextarea() {
+    userInput.style.height = 'auto';
+    userInput.style.height = (userInput.scrollHeight) + 'px';
+    if (userInput.scrollHeight > 200) { userInput.style.overflowY = 'scroll'; userInput.style.height = '200px'; }
+    else userInput.style.overflowY = 'hidden';
+}
+
+function toggleDarkMode() {
+    isDarkMode = !isDarkMode; applyDarkMode(); localStorage.setItem('darkMode', isDarkMode);
+}
+
+function applyDarkMode() {
+    if (isDarkMode) { document.documentElement.classList.add('dark'); document.getElementById('dark-mode-icon').classList.replace('fa-moon', 'fa-sun'); }
+    else { document.documentElement.classList.remove('dark'); document.getElementById('dark-mode-icon').classList.replace('fa-sun', 'fa-moon'); }
+}
+
+function checkVisionSupport() {
+    const visionModels = ['gemma3', 'llava', 'moondream', 'qwen2-vl', 'bakllava'];
+    const currentModel = modelSelect.value.toLowerCase();
+    const supportsVision = visionModels.some(vm => currentModel.includes(vm));
+    imageBtn.disabled = !supportsVision;
+    imageBtn.title = supportsVision ? 'إرسال صورة' : 'هذا النموذج لا يدعم الرؤية';
+}
+
+function triggerImageUpload() { document.getElementById('image-input').click(); }
+
+function handleImageSelect(event) {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => { selectedImageBase64 = e.target.result; previewImg.src = selectedImageBase64; imagePreview.classList.remove('hidden'); };
+        reader.readAsDataURL(file);
+    }
+}
+
+function removeImage() { selectedImageBase64 = null; imagePreview.classList.add('hidden'); document.getElementById('image-input').value = ''; }
+
+function openSettings() {
+    document.getElementById('system-prompt').value = settings.systemPrompt;
+    document.getElementById('temp-range').value = settings.temperature;
+    document.getElementById('temp-val').textContent = settings.temperature;
+    document.getElementById('tools-enabled').checked = settings.toolsEnabled;
+    document.getElementById('settings-modal').classList.remove('hidden');
+}
+
+function closeSettings() { document.getElementById('settings-modal').classList.add('hidden'); }
+
+function saveSettings() {
+    settings.systemPrompt = document.getElementById('system-prompt').value;
+    settings.temperature = document.getElementById('temp-range').value;
+    settings.toolsEnabled = document.getElementById('tools-enabled').checked;
+    localStorage.setItem('allamaSettings', JSON.stringify(settings));
+    closeSettings();
+}
+
+function loadSettings() {
+    const saved = localStorage.getItem('allamaSettings');
+    if (saved) settings = JSON.parse(saved);
+    const savedDark = localStorage.getItem('darkMode');
+    if (savedDark !== null) isDarkMode = savedDark === 'true';
+}
+
+async function addNewModel() {
+    const name = document.getElementById('new-model-name').value.trim();
+    if (name) {
+        models.push({ name, size: 0 }); renderModelSelect();
+        modelSelect.value = name; document.getElementById('new-model-name').value = '';
+        checkVisionSupport();
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div'); div.textContent = text; return div.innerHTML;
+}
+
+init();
