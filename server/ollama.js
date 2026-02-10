@@ -1,14 +1,33 @@
 const axios = require('axios');
+const http = require('http');
+const https = require('https');
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 
-async function chat(model, messages, options = {}, tools = []) {
-    const payload = { model, messages, stream: false, options };
-    if (tools && tools.length > 0) payload.tools = tools;
+// Persistent agents for faster connectivity
+const httpAgent = new http.Agent({ keepAlive: true });
+const httpsAgent = new https.Agent({ keepAlive: true });
+
+async function chat(model, messages, options = {}, tools = [], stream = false) {
+    const payload = {
+        model,
+        messages,
+        stream,
+        options,
+    };
+
+    if (tools && tools.length > 0) {
+        payload.tools = tools;
+    }
 
     try {
-        const response = await axios.post(`${OLLAMA_URL}/api/chat`, payload);
-        return response.data;
+        const response = await axios.post(`${OLLAMA_URL}/api/chat`, payload, {
+            responseType: stream ? 'stream' : 'json',
+            httpAgent,
+            httpsAgent,
+            headers: { 'Connection': 'keep-alive' }
+        });
+        return response;
     } catch (error) {
         console.error('Ollama API Error:', error.response ? error.response.data : error.message);
         throw error;
@@ -17,7 +36,10 @@ async function chat(model, messages, options = {}, tools = []) {
 
 async function listModels() {
     try {
-        const response = await axios.get(`${OLLAMA_URL}/api/tags`);
+        const response = await axios.get(`${OLLAMA_URL}/api/tags`, {
+            httpAgent,
+            httpsAgent
+        });
         return response.data;
     } catch (error) {
         console.error('Ollama List Models Error:', error.message);
@@ -25,4 +47,7 @@ async function listModels() {
     }
 }
 
-module.exports = { chat, listModels };
+module.exports = {
+    chat,
+    listModels
+};

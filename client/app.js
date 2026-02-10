@@ -4,7 +4,9 @@ let models = [];
 let settings = {
     systemPrompt: 'أنت مساعد ذكي ومتعاون، تدعى "علّامة". تجيب باللغة العربية بشكل افتراضي.',
     temperature: 0.7,
-    toolsEnabled: true
+    toolsEnabled: true,
+    streamEnabled: true,
+    thinkingEnabled: true
 };
 let selectedImageBase64 = null;
 let isDarkMode = false;
@@ -14,6 +16,7 @@ const userInput = document.getElementById('user-input');
 const modelSelect = document.getElementById('model-select');
 const sessionList = document.getElementById('session-list');
 const sidebar = document.getElementById('sidebar');
+const sidebarOverlay = document.getElementById('sidebar-overlay');
 const imagePreview = document.getElementById('image-preview');
 const previewImg = document.getElementById('preview-img');
 const sendBtn = document.getElementById('send-btn');
@@ -44,8 +47,8 @@ async function fetchModels() {
 }
 
 function renderModelSelect() {
-    modelSelect.innerHTML = models.map(m => `<option value="${m.name}">${m.name} (${(m.size / (1024*1024*1024)).toFixed(1)} GB)</option>`).join('') + '<option value="custom">إضافة نموذج آخر...</option>';
-    const defaultModels = ['gemma3:latest', 'qwen2.5:latest', 'llama3:latest'];
+    modelSelect.innerHTML = models.map(m => `<option value="${m.name}">${m.name}</option>`).join('') + '<option value="custom">إضافة...</option>';
+    const defaultModels = ['gemma3:latest', 'gemma3:270m', 'qwen2.5:latest', 'llama3:latest'];
     for (const def of defaultModels) {
         if (models.find(m => m.name === def)) { modelSelect.value = def; break; }
     }
@@ -62,8 +65,8 @@ async function fetchSessions() {
 
 function renderSessionList(sessions) {
     sessionList.innerHTML = sessions.map(s => `
-        <div class="flex items-center group">
-            <button onclick="loadSession('${s.id}')" class="flex-1 text-right p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 truncate ${currentSessionId === s.id ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : ''}">
+        <div class="flex items-center group px-2">
+            <button onclick="loadSession('${s.id}')" class="flex-1 text-right p-3 rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-900 truncate transition-all ${currentSessionId === s.id ? 'bg-black text-white dark:bg-white dark:text-black font-bold' : 'text-gray-600 dark:text-gray-400'}">
                 <i class="far fa-comment-alt ml-2"></i> ${s.title || 'محادثة جديدة'}
             </button>
             <button onclick="deleteSession('${s.id}')" class="p-3 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><i class="fas fa-trash"></i></button>
@@ -115,6 +118,7 @@ async function sendMessage() {
     renderMessages();
     userInput.value = '';
     autoResizeTextarea();
+    const tempImg = selectedImageBase64;
     removeImage();
 
     await fetch('/api/messages', {
@@ -131,9 +135,15 @@ async function sendMessage() {
 
     try {
         sendBtn.disabled = true;
+
+        // Show loading animation in a new message bubble
+        const aiMsgIndex = currentMessages.length;
+        currentMessages.push({ role: 'assistant', content: '', loading: true });
+        renderMessages();
+
         const messagesForApi = [];
         if (settings.systemPrompt) messagesForApi.push({ role: 'system', content: settings.systemPrompt });
-        const history = currentMessages.map(m => ({
+        const history = currentMessages.slice(0, aiMsgIndex).map(m => ({
             role: m.role,
             content: m.content,
             images: m.images ? (typeof m.images === 'string' ? JSON.parse(m.images) : m.images.map(img => img.includes(',') ? img.split(',')[1] : img)) : undefined
@@ -143,45 +153,122 @@ async function sendMessage() {
         const res = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sessionId: currentSessionId, model: modelSelect.value, messages: messagesForApi, options: { temperature: parseFloat(settings.temperature) }, toolsEnabled: settings.toolsEnabled })
+            body: JSON.stringify({
+                sessionId: currentSessionId,
+                model: modelSelect.value,
+                messages: messagesForApi,
+                options: { temperature: parseFloat(settings.temperature) },
+                toolsEnabled: settings.toolsEnabled,
+                stream: settings.streamEnabled
+            })
         });
-        const data = await res.json();
-        if (data.message) { currentMessages.push(data.message); renderMessages(); }
-    } catch (err) { console.error('Chat error:', err); appendErrorMessage('عذراً، حدث خطأ أثناء الاتصال بالنموذج.'); }
+
+        if (settings.streamEnabled) {
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let aiContent = "";
+            let fullResponse = "";
+
+            // Remove loading state
+            currentMessages[aiMsgIndex].loading = false;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n');
+
+                for (const line of lines) {
+                    if (!line.trim()) continue;
+                    try {
+                        const json = JSON.parse(line);
+                        if (json.message && json.message.content) {
+                            aiContent += json.message.content;
+                            currentMessages[aiMsgIndex].content = aiContent;
+                            renderMessages();
+                        }
+                    } catch (e) { console.error("Error parsing chunk", e); }
+                }
+            }
+
+            // Save final message to DB
+            await fetch('/api/messages', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sessionId: currentSessionId, role: 'assistant', content: aiContent })
+            });
+
+        } else {
+            const data = await res.json();
+            if (data.message) {
+                currentMessages[aiMsgIndex] = data.message;
+                renderMessages();
+            }
+        }
+    } catch (err) {
+        console.error('Chat error:', err);
+        currentMessages.pop(); // remove loading message
+        appendErrorMessage('عذراً، حدث خطأ أثناء الاتصال بالنموذج.');
+    }
     finally { sendBtn.disabled = false; }
 }
 
 function renderMessages() {
     if (currentMessages.length === 0) {
-        chatMessages.innerHTML = `<div class="flex justify-center items-center h-full text-gray-400"><div class="text-center"><i class="fas fa-robot text-6xl mb-4"></i><p class="text-xl">ابدأ محادثة جديدة مع علّامة</p></div></div>`;
+        chatMessages.innerHTML = `<div class="flex justify-center items-center h-full text-gray-300 dark:text-zinc-800"><div class="text-center"><i class="fas fa-terminal text-8xl mb-4"></i><p class="text-2xl font-bold italic">ALLAMA</p></div></div>`;
         return;
     }
-    chatMessages.innerHTML = currentMessages.map(msg => {
+    chatMessages.innerHTML = currentMessages.map((msg, index) => {
         if (msg.role === 'tool') return '';
 
-        // If assistant message is just tool calls (saved as JSON array)
-        if (msg.role === 'assistant' && msg.content.startsWith('[{"function":')) {
-            return `
-                <div class="flex justify-end">
-                    <div class="max-w-[85%] bg-gray-100 text-gray-500 border border-gray-200 rounded-t-2xl rounded-br-2xl p-2 text-xs italic">
-                        <i class="fas fa-cog fa-spin ml-1"></i> جاري استخدام الأدوات...
-                    </div>
-                </div>
-            `;
+        // Handle tool execution placeholder
+        if (msg.role === 'assistant' && msg.content && msg.content.startsWith('[{"function":')) {
+            return `<div class="flex justify-start"><div class="max-w-[85%] text-gray-400 text-xs italic"><i class="fas fa-cog fa-spin ml-1"></i> جاري استخدام الأدوات...</div></div>`;
         }
 
         const isUser = msg.role === 'user';
+
+        let contentHtml = '';
+        if (msg.loading) {
+            contentHtml = `<div class="flex items-center space-x-2 py-2"><div class="dot-flashing"></div></div>`;
+        } else {
+            let content = msg.content || '';
+            let thinking = '';
+
+            // Detect thinking (experimental for models like DeepSeek or LFM)
+            if (settings.thinkingEnabled) {
+                const thoughtMatch = content.match(/<thought>([\s\S]*?)<\/thought>/);
+                if (thoughtMatch) {
+                    thinking = `<div class="thinking-block">${marked.parse(thoughtMatch[1])}</div>`;
+                    content = content.replace(/<thought>[\s\S]*?<\/thought>/, '');
+                } else if (content.includes('Thinking:') || content.includes('التفكير:')) {
+                    // Simple heuristic for some models
+                    const parts = content.split('\n\n');
+                    if (parts.length > 1 && (parts[0].includes('Thinking') || parts[0].length < 200)) {
+                         // This is very loose, better stick to tags if possible
+                    }
+                }
+            } else {
+                // Hide thinking if disabled
+                content = content.replace(/<thought>[\s\S]*?<\/thought>/, '');
+            }
+
+            contentHtml = thinking + DOMPurify.sanitize(marked.parse(content));
+        }
+
         let imagesHtml = '';
         if (msg.images) {
             const imgs = typeof msg.images === 'string' ? JSON.parse(msg.images) : msg.images;
-            imagesHtml = `<div class="flex gap-2 mb-2">${imgs.map(img => `<img src="${img.startsWith('data:') ? img : 'data:image/jpeg;base64,' + img}" class="h-32 rounded shadow-sm">`).join('')}</div>`;
+            imagesHtml = `<div class="flex gap-2 mb-2 flex-wrap">${imgs.map(img => `<img src="${img.startsWith('data:') ? img : 'data:image/jpeg;base64,' + img}" class="h-40 rounded-xl shadow-sm border border-gray-100 dark:border-zinc-800">`).join('')}</div>`;
         }
+
         return `
-            <div class="flex ${isUser ? 'justify-start' : 'justify-end'}">
-                <div class="max-w-[85%] ${isUser ? 'bg-blue-600 text-white rounded-t-2xl rounded-bl-2xl' : 'bg-white text-gray-900 border border-gray-200 rounded-t-2xl rounded-br-2xl shadow-sm'} p-4">
+            <div class="flex ${isUser ? 'justify-start' : 'justify-end'} group">
+                <div class="max-w-[90%] md:max-w-[80%] ${isUser ? 'bg-black text-white dark:bg-white dark:text-black rounded-2xl rounded-bl-none shadow-md' : 'bg-white text-gray-900 dark:bg-zinc-900 dark:text-gray-100 border border-gray-100 dark:border-zinc-800 rounded-2xl rounded-br-none'} p-4">
                     ${imagesHtml}
-                    <div class="markdown-content ${!isUser ? 'text-gray-800' : ''}">
-                        ${isUser ? escapeHtml(msg.content) : DOMPurify.sanitize(marked.parse(msg.content))}
+                    <div class="markdown-content text-sm md:text-base leading-relaxed">
+                        ${isUser ? escapeHtml(msg.content) : contentHtml}
                     </div>
                 </div>
             </div>
@@ -192,21 +279,26 @@ function renderMessages() {
 }
 
 function appendErrorMessage(text) {
-    chatMessages.innerHTML += `<div class="flex justify-start"><div class="max-w-[85%] bg-red-50 text-red-600 border border-red-200 rounded-t-2xl rounded-bl-2xl p-4">${text}</div></div>`;
+    chatMessages.innerHTML += `<div class="flex justify-center"><div class="bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400 border border-red-100 dark:border-red-900/30 rounded-xl px-4 py-2 text-sm">${text}</div></div>`;
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
 function toggleSidebar(show) {
-    if (show === undefined) sidebar.classList.toggle('translate-x-full');
-    else if (show) sidebar.classList.remove('translate-x-full');
-    else sidebar.classList.add('translate-x-full');
+    if (show === undefined) {
+        const isHidden = sidebar.classList.contains('translate-x-full');
+        toggleSidebar(isHidden);
+    } else if (show) {
+        sidebar.classList.remove('translate-x-full');
+        sidebarOverlay.classList.remove('hidden');
+    } else {
+        sidebar.classList.add('translate-x-full');
+        sidebarOverlay.classList.add('hidden');
+    }
 }
 
 function autoResizeTextarea() {
     userInput.style.height = 'auto';
     userInput.style.height = (userInput.scrollHeight) + 'px';
-    if (userInput.scrollHeight > 200) { userInput.style.overflowY = 'scroll'; userInput.style.height = '200px'; }
-    else userInput.style.overflowY = 'hidden';
 }
 
 function toggleDarkMode() {
@@ -223,7 +315,6 @@ function checkVisionSupport() {
     const currentModel = modelSelect.value.toLowerCase();
     const supportsVision = visionModels.some(vm => currentModel.includes(vm));
     imageBtn.disabled = !supportsVision;
-    imageBtn.title = supportsVision ? 'إرسال صورة' : 'هذا النموذج لا يدعم الرؤية';
 }
 
 function triggerImageUpload() { document.getElementById('image-input').click(); }
@@ -243,7 +334,8 @@ function openSettings() {
     document.getElementById('system-prompt').value = settings.systemPrompt;
     document.getElementById('temp-range').value = settings.temperature;
     document.getElementById('temp-val').textContent = settings.temperature;
-    document.getElementById('tools-enabled').checked = settings.toolsEnabled;
+    document.getElementById('stream-enabled').checked = settings.streamEnabled;
+    document.getElementById('thinking-enabled').checked = settings.thinkingEnabled;
     document.getElementById('settings-modal').classList.remove('hidden');
 }
 
@@ -252,14 +344,15 @@ function closeSettings() { document.getElementById('settings-modal').classList.a
 function saveSettings() {
     settings.systemPrompt = document.getElementById('system-prompt').value;
     settings.temperature = document.getElementById('temp-range').value;
-    settings.toolsEnabled = document.getElementById('tools-enabled').checked;
+    settings.streamEnabled = document.getElementById('stream-enabled').checked;
+    settings.thinkingEnabled = document.getElementById('thinking-enabled').checked;
     localStorage.setItem('allamaSettings', JSON.stringify(settings));
     closeSettings();
 }
 
 function loadSettings() {
     const saved = localStorage.getItem('allamaSettings');
-    if (saved) settings = JSON.parse(saved);
+    if (saved) settings = { ...settings, ...JSON.parse(saved) };
     const savedDark = localStorage.getItem('darkMode');
     if (savedDark !== null) isDarkMode = savedDark === 'true';
 }

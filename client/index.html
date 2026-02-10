@@ -2,106 +2,225 @@
 <html lang="ar" dir="rtl" class="h-full">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>علّامة - Allama</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap');
         body { font-family: 'Cairo', sans-serif; }
-        .markdown-content pre { background: #1e1e1e; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; }
+        .markdown-content pre { background: #f3f4f6; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; border: 1px solid #e5e7eb; }
+        .dark .markdown-content pre { background: #111827; border-color: #374151; }
         .markdown-content code { font-family: monospace; }
-        .dark, .dark body { background-color: #111827; color: white; }
-        .dark .bg-white { background-color: #1f2937; color: white; }
-        .dark .text-gray-900 { color: #f3f4f6; }
-        .dark .text-gray-700 { color: #d1d5db; }
-        .dark .border-gray-200 { border-color: #374151; }
+
+        /* Ollama minimalist style */
+        .bg-ollama-white { background-color: #ffffff; }
+        .bg-ollama-black { background-color: #000000; }
+
+        .dark { background-color: #000000; color: #ffffff; }
+        .dark .bg-white { background-color: #111111; color: #ffffff; }
+        .dark .border-gray-200 { border-color: #222222; }
+
+        /* Loading animation */
+        .dot-flashing {
+            position: relative;
+            width: 6px;
+            height: 6px;
+            border-radius: 5px;
+            background-color: #3b82f6;
+            color: #3b82f6;
+            animation: dot-flashing 1s infinite linear alternate;
+            animation-delay: 0.5s;
+        }
+        .dot-flashing::before, .dot-flashing::after {
+            content: "";
+            display: inline-block;
+            position: absolute;
+            top: 0;
+        }
+        .dot-flashing::before {
+            left: -12px;
+            width: 6px;
+            height: 6px;
+            border-radius: 5px;
+            background-color: #3b82f6;
+            color: #3b82f6;
+            animation: dot-flashing 1s infinite linear alternate;
+            animation-delay: 0s;
+        }
+        .dot-flashing::after {
+            left: 12px;
+            width: 6px;
+            height: 6px;
+            border-radius: 5px;
+            background-color: #3b82f6;
+            color: #3b82f6;
+            animation: dot-flashing 1s infinite linear alternate;
+            animation-delay: 1s;
+        }
+        @keyframes dot-flashing {
+            0% { background-color: #3b82f6; }
+            50%, 100% { background-color: #ebe6ff; }
+        }
+
+        /* Thinking section */
+        .thinking-block {
+            border-right: 2px solid #e5e7eb;
+            margin-bottom: 1rem;
+            padding-right: 1rem;
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+        .dark .thinking-block { border-color: #374151; color: #9ca3af; }
     </style>
 </head>
-<body class="h-full bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
-    <div class="flex h-full overflow-hidden">
-        <aside id="sidebar" class="fixed inset-y-0 right-0 z-50 w-72 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 transform translate-x-full transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0">
+<body class="h-full bg-white dark:bg-black transition-colors duration-200">
+    <div class="flex h-full overflow-hidden relative">
+        <!-- Overlay for mobile sidebar -->
+        <div id="sidebar-overlay" onclick="toggleSidebar(false)" class="fixed inset-0 bg-black/50 z-40 hidden lg:hidden"></div>
+
+        <!-- Sidebar (Drawer) -->
+        <aside id="sidebar" class="fixed inset-y-0 right-0 z-50 w-72 bg-white dark:bg-black border-l border-gray-200 dark:border-gray-800 transform translate-x-full transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0">
             <div class="flex flex-col h-full">
-                <div class="p-4 border-b border-gray-200 flex justify-between items-center">
+                <div class="p-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
                     <h2 class="text-xl font-bold">المحادثات</h2>
-                    <button onclick="newChat()" class="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><i class="fas fa-plus"></i></button>
+                    <button onclick="newChat()" class="p-2 bg-black dark:bg-white text-white dark:text-black rounded-lg hover:opacity-80">
+                        <i class="fas fa-plus"></i>
+                    </button>
                 </div>
                 <div id="session-list" class="flex-1 overflow-y-auto p-2 space-y-2"></div>
-            </div>
-        </aside>
-        <main class="flex-1 flex flex-col h-full relative">
-            <header class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 flex justify-between items-center z-10">
-                <div class="flex items-center gap-4">
-                    <button onclick="toggleSidebar()" class="lg:hidden p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"><i class="fas fa-bars"></i></button>
-                    <h1 class="text-2xl font-bold text-blue-600">علّامة</h1>
-                    <select id="model-select" class="bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5">
-                        <option value="">تحميل النماذج...</option>
-                    </select>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button onclick="toggleDarkMode()" class="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded" title="الوضع الليلي"><i id="dark-mode-icon" class="fas fa-moon"></i></button>
-                    <button onclick="openSettings()" class="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded" title="الإعدادات"><i class="fas fa-cog"></i></button>
-                </div>
-            </header>
-            <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4">
-                <div class="flex justify-center items-center h-full text-gray-400">
-                    <div class="text-center">
-                        <i class="fas fa-robot text-6xl mb-4"></i>
-                        <p class="text-xl">ابدأ محادثة جديدة مع علّامة</p>
+
+                <!-- About Developer Section -->
+                <div class="p-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-zinc-900">
+                    <h3 class="text-sm font-bold mb-2">عن المطور</h3>
+                    <div class="text-xs space-y-1 text-gray-600 dark:text-gray-400">
+                        <p class="font-semibold text-gray-900 dark:text-white">muzammilsoft</p>
+                        <p>مطور تطبيقات وتطبيقات ويب</p>
+                        <div class="flex gap-2 mt-2">
+                            <a href="https://github.com/muzammilsoft" target="_blank" class="hover:text-black dark:hover:text-white"><i class="fab fa-github"></i></a>
+                            <a href="https://facebook.com/khartoum.ghoul" target="_blank" class="hover:text-blue-600"><i class="fab fa-facebook"></i></a>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
-                <div id="image-preview" class="hidden mb-2 relative inline-block">
-                    <img id="preview-img" src="" class="h-20 w-20 object-cover rounded border border-gray-300 dark:border-gray-600">
-                    <button onclick="removeImage()" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"><i class="fas fa-times"></i></button>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col h-full relative min-w-0">
+            <!-- Header -->
+            <header class="bg-white dark:bg-black border-b border-gray-200 dark:border-gray-800 p-4 flex justify-between items-center z-10">
+                <div class="flex items-center gap-3">
+                    <button onclick="toggleSidebar(true)" class="lg:hidden p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-900 rounded">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <h1 class="text-xl md:text-2xl font-black tracking-tighter text-black dark:text-white">OLLAMA <span class="text-gray-400 font-light">علّامة</span></h1>
                 </div>
-                <div class="flex gap-2">
-                    <button id="image-btn" onclick="triggerImageUpload()" class="p-3 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg disabled:opacity-50" title="إرسال صورة"><i class="fas fa-image"></i></button>
-                    <input type="file" id="image-input" class="hidden" accept="image/*" onchange="handleImageSelect(event)">
-                    <textarea id="user-input" rows="1" class="flex-1 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 resize-none" placeholder="اكتب رسالتك هنا..."></textarea>
-                    <button onclick="sendMessage()" id="send-btn" class="p-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400"><i class="fas fa-paper-plane"></i></button>
+                <div class="flex items-center gap-1 md:gap-2">
+                    <select id="model-select" class="bg-gray-50 dark:bg-zinc-900 border border-gray-300 dark:border-gray-800 text-gray-900 dark:text-gray-100 text-sm rounded-lg focus:ring-black focus:border-black block p-2 max-w-[120px] md:max-w-none">
+                        <option value="">...</option>
+                    </select>
+                    <button onclick="toggleDarkMode()" class="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-900 rounded" title="الوضع الليلي">
+                        <i id="dark-mode-icon" class="fas fa-moon"></i>
+                    </button>
+                    <button onclick="openSettings()" class="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-900 rounded" title="الإعدادات">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Chat Area -->
+            <div id="chat-messages" class="flex-1 overflow-y-auto p-4 md:p-8 space-y-6">
+                <!-- Messages will be here -->
+                <div class="flex justify-center items-center h-full text-gray-300 dark:text-zinc-800">
+                    <div class="text-center">
+                        <i class="fas fa-terminal text-8xl mb-4"></i>
+                        <p class="text-2xl font-bold italic">ALLAMA</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="p-4 bg-white dark:bg-black border-t border-gray-200 dark:border-gray-800">
+                <div class="max-w-4xl mx-auto">
+                    <div id="image-preview" class="hidden mb-2 relative inline-block">
+                        <img id="preview-img" src="" class="h-20 w-20 object-cover rounded border border-gray-300 dark:border-gray-800">
+                        <button onclick="removeImage()" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs shadow-lg">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="flex gap-2 items-end">
+                        <button id="image-btn" onclick="triggerImageUpload()" class="p-3 text-gray-500 hover:bg-gray-100 dark:hover:bg-zinc-900 rounded-lg disabled:opacity-30" title="إرسال صورة">
+                            <i class="fas fa-image"></i>
+                        </button>
+                        <input type="file" id="image-input" class="hidden" accept="image/*" onchange="handleImageSelect(event)">
+                        <textarea id="user-input" rows="1" class="flex-1 bg-gray-50 dark:bg-zinc-900 border border-gray-300 dark:border-gray-800 text-gray-900 dark:text-gray-100 text-sm rounded-xl focus:ring-black focus:border-black block p-3 resize-none max-h-40" placeholder="اكتب رسالتك..."></textarea>
+                        <button onclick="sendMessage()" id="send-btn" class="p-3 bg-black dark:bg-white text-white dark:text-black rounded-xl hover:opacity-80 disabled:opacity-30 transition-all">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                    <p class="text-[10px] text-center text-gray-400 mt-2">علّامة قد يرتكب أخطاء. تحقق من المعلومات الهامة.</p>
                 </div>
             </div>
         </main>
     </div>
-    <div id="settings-modal" class="hidden fixed inset-0 z-[60] overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="hidden fixed inset-0 z-[60] overflow-y-auto bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white dark:bg-zinc-950 rounded-2xl shadow-2xl w-full max-w-md border border-gray-200 dark:border-gray-800">
             <div class="p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-bold">إعدادات النموذج</h3>
-                    <button onclick="closeSettings()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-lg font-bold">الإعدادات</h3>
+                    <button onclick="closeSettings()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                        <i class="fas fa-times"></i>
+                    </button>
                 </div>
-                <div class="space-y-4">
+                <div class="space-y-5">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">رسالة النظام (System Message)</label>
-                        <textarea id="system-prompt" rows="3" class="mt-1 block w-full bg-gray-50 border border-gray-300 rounded-lg p-2.5 text-sm" placeholder="أنت مساعد ذكي ومتعاون..."></textarea>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-2">رسالة النظام (System Message)</label>
+                        <textarea id="system-prompt" rows="3" class="mt-1 block w-full bg-gray-50 dark:bg-zinc-900 border border-gray-300 dark:border-gray-800 rounded-xl p-3 text-sm" placeholder="أنت مساعد ذكي..."></textarea>
+                    </div>
+                    <div class="flex justify-between items-center bg-gray-50 dark:bg-zinc-900 p-3 rounded-xl border border-gray-100 dark:border-gray-800">
+                        <label class="text-sm font-medium">الوضع المتدفق (Stream)</label>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input id="stream-enabled" type="checkbox" checked class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-black dark:peer-checked:bg-blue-600"></div>
+                        </label>
+                    </div>
+                    <div class="flex justify-between items-center bg-gray-50 dark:bg-zinc-900 p-3 rounded-xl border border-gray-100 dark:border-gray-800">
+                        <label class="text-sm font-medium text-gray-700 dark:text-gray-200">عرض التفكير (Show Thinking)</label>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input id="thinking-enabled" type="checkbox" checked class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-black dark:peer-checked:bg-blue-600"></div>
+                        </label>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">درجة الحرارة (Temperature)</label>
-                        <input type="range" id="temp-range" min="0" max="2" step="0.1" value="0.7" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
-                        <div class="flex justify-between text-xs text-gray-500"><span>0.0</span><span id="temp-val">0.7</span><span>2.0</span></div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-2">درجة الحرارة (Temperature)</label>
+                        <input type="range" id="temp-range" min="0" max="2" step="0.1" value="0.7" class="w-full h-1.5 bg-gray-200 dark:bg-gray-800 rounded-lg appearance-none cursor-pointer accent-black dark:accent-blue-600">
+                        <div class="flex justify-between text-[10px] text-gray-400 mt-1">
+                            <span>0.0 (دقيق)</span>
+                            <span id="temp-val" class="font-bold text-black dark:text-white">0.7</span>
+                            <span>2.0 (مبدع)</span>
+                        </div>
                     </div>
-                    <div class="flex items-center">
-                        <input id="tools-enabled" type="checkbox" checked class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500">
-                        <label for="tools-enabled" class="mr-2 text-sm font-medium text-gray-700">تفعيل الأدوات (Function Calling)</label>
-                    </div>
-                    <div class="pt-4 border-t border-gray-200">
-                        <h4 class="text-sm font-bold mb-2">إضافة نموذج جديد</h4>
+                    <div class="pt-4 border-t border-gray-100 dark:border-gray-800">
+                        <h4 class="text-xs font-bold text-gray-500 uppercase mb-2">إضافة نموذج</h4>
                         <div class="flex gap-2">
-                            <input id="new-model-name" type="text" class="flex-1 bg-gray-50 border border-gray-300 rounded-lg p-2 text-sm" placeholder="اسم النموذج (e.g. llama3)">
-                            <button onclick="addNewModel()" class="bg-green-600 text-white px-3 py-1 rounded-lg text-sm hover:bg-green-700">إضافة</button>
+                            <input id="new-model-name" type="text" class="flex-1 bg-gray-50 dark:bg-zinc-900 border border-gray-300 dark:border-gray-800 rounded-lg p-2 text-sm" placeholder="e.g. llama3">
+                            <button onclick="addNewModel()" class="bg-black dark:bg-white text-white dark:text-black px-4 py-2 rounded-lg text-sm font-bold">إضافة</button>
                         </div>
                     </div>
                 </div>
-                <div class="mt-6"><button onclick="saveSettings()" class="w-full bg-blue-600 text-white rounded-lg py-2 hover:bg-blue-700">حفظ الإعدادات</button></div>
+                <div class="mt-8">
+                    <button onclick="saveSettings()" class="w-full bg-black dark:bg-white text-white dark:text-black rounded-xl py-3 font-bold hover:opacity-90 transition-all shadow-lg">حفظ التغييرات</button>
+                </div>
             </div>
         </div>
     </div>
+
     <script src="app.js"></script>
 </body>
 </html>
