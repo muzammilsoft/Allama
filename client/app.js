@@ -158,6 +158,18 @@ function renderMessages() {
     }
     chatMessages.innerHTML = currentMessages.map(msg => {
         if (msg.role === 'tool') return '';
+
+        // If assistant message is just tool calls (saved as JSON array)
+        if (msg.role === 'assistant' && msg.content.startsWith('[{"function":')) {
+            return `
+                <div class="flex justify-end">
+                    <div class="max-w-[85%] bg-gray-100 text-gray-500 border border-gray-200 rounded-t-2xl rounded-br-2xl p-2 text-xs italic">
+                        <i class="fas fa-cog fa-spin ml-1"></i> جاري استخدام الأدوات...
+                    </div>
+                </div>
+            `;
+        }
+
         const isUser = msg.role === 'user';
         let imagesHtml = '';
         if (msg.images) {

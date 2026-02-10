@@ -64,14 +64,31 @@ app.post('/api/chat', async (req, res) => {
         while (toolCallsMade < MAX_TOOL_CALLS) {
             response = await ollama.chat(model, currentMessages, options, toolsEnabled ? tools.toolsDefinition : []);
             if (response.message.tool_calls && response.message.tool_calls.length > 0) {
+                // Save Assistant message with tool calls
+                if (sessionId) {
+                    db.addMessage(sessionId, response.message.role, JSON.stringify(response.message.tool_calls));
+                }
                 currentMessages.push(response.message);
+
                 for (const toolCall of response.message.tool_calls) {
                     const result = await tools.handleToolCall(toolCall);
-                    currentMessages.push({ role: 'tool', content: JSON.stringify(result) });
+                    const toolResponse = {
+                        role: 'tool',
+                        content: JSON.stringify(result),
+                        // Ollama/OpenAI standard requires tool_call_id
+                        tool_call_id: toolCall.id || ""
+                    };
+                    currentMessages.push(toolResponse);
+
+                    // Save Tool result
+                    if (sessionId) {
+                        db.addMessage(sessionId, 'tool', toolResponse.content);
+                    }
                 }
                 toolCallsMade++;
             } else break;
         }
+        // Save final AI response
         if (sessionId && response.message) db.addMessage(sessionId, response.message.role, response.message.content);
         res.json(response);
     } catch (error) { res.status(500).json({ error: error.message }); }
