@@ -15,16 +15,16 @@
         body { font-family: 'Cairo', sans-serif; }
         .markdown-content pre { background: #1e1e1e; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; }
         .markdown-content code { font-family: monospace; }
-        .dark { background-color: #111827; color: white; }
+        .dark, .dark body { background-color: #111827; color: white; }
         .dark .bg-white { background-color: #1f2937; color: white; }
         .dark .text-gray-900 { color: #f3f4f6; }
         .dark .text-gray-700 { color: #d1d5db; }
         .dark .border-gray-200 { border-color: #374151; }
     </style>
 </head>
-<body class="h-full bg-gray-50 transition-colors duration-200">
+<body class="h-full bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
     <div class="flex h-full overflow-hidden">
-        <aside id="sidebar" class="fixed inset-y-0 right-0 z-50 w-72 bg-white border-l border-gray-200 transform translate-x-full transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0">
+        <aside id="sidebar" class="fixed inset-y-0 right-0 z-50 w-72 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 transform translate-x-full transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0">
             <div class="flex flex-col h-full">
                 <div class="p-4 border-b border-gray-200 flex justify-between items-center">
                     <h2 class="text-xl font-bold">المحادثات</h2>
@@ -34,17 +34,17 @@
             </div>
         </aside>
         <main class="flex-1 flex flex-col h-full relative">
-            <header class="bg-white border-b border-gray-200 p-4 flex justify-between items-center z-10">
+            <header class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 flex justify-between items-center z-10">
                 <div class="flex items-center gap-4">
-                    <button onclick="toggleSidebar()" class="lg:hidden p-2 text-gray-600 hover:bg-gray-100 rounded"><i class="fas fa-bars"></i></button>
+                    <button onclick="toggleSidebar()" class="lg:hidden p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"><i class="fas fa-bars"></i></button>
                     <h1 class="text-2xl font-bold text-blue-600">علّامة</h1>
-                    <select id="model-select" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5">
+                    <select id="model-select" class="bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5">
                         <option value="">تحميل النماذج...</option>
                     </select>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button onclick="toggleDarkMode()" class="p-2 text-gray-600 hover:bg-gray-100 rounded" title="الوضع الليلي"><i id="dark-mode-icon" class="fas fa-moon"></i></button>
-                    <button onclick="openSettings()" class="p-2 text-gray-600 hover:bg-gray-100 rounded" title="الإعدادات"><i class="fas fa-cog"></i></button>
+                    <button onclick="toggleDarkMode()" class="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded" title="الوضع الليلي"><i id="dark-mode-icon" class="fas fa-moon"></i></button>
+                    <button onclick="openSettings()" class="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded" title="الإعدادات"><i class="fas fa-cog"></i></button>
                 </div>
             </header>
             <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4">
@@ -55,15 +55,15 @@
                     </div>
                 </div>
             </div>
-            <div class="p-4 bg-white border-t border-gray-200">
+            <div class="p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
                 <div id="image-preview" class="hidden mb-2 relative inline-block">
-                    <img id="preview-img" src="" class="h-20 w-20 object-cover rounded border border-gray-300">
+                    <img id="preview-img" src="" class="h-20 w-20 object-cover rounded border border-gray-300 dark:border-gray-600">
                     <button onclick="removeImage()" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"><i class="fas fa-times"></i></button>
                 </div>
                 <div class="flex gap-2">
-                    <button id="image-btn" onclick="triggerImageUpload()" class="p-3 text-gray-500 hover:bg-gray-100 rounded-lg disabled:opacity-50" title="إرسال صورة"><i class="fas fa-image"></i></button>
+                    <button id="image-btn" onclick="triggerImageUpload()" class="p-3 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg disabled:opacity-50" title="إرسال صورة"><i class="fas fa-image"></i></button>
                     <input type="file" id="image-input" class="hidden" accept="image/*" onchange="handleImageSelect(event)">
-                    <textarea id="user-input" rows="1" class="flex-1 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 resize-none" placeholder="اكتب رسالتك هنا..."></textarea>
+                    <textarea id="user-input" rows="1" class="flex-1 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 resize-none" placeholder="اكتب رسالتك هنا..."></textarea>
                     <button onclick="sendMessage()" id="send-btn" class="p-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400"><i class="fas fa-paper-plane"></i></button>
                 </div>
             </div>
