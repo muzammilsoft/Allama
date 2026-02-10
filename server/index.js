@@ -1,7 +1,6 @@
 const express = require('express');
 const path = require('path');
 const cors = require('cors');
-const bodyParser = require('body-parser');
 const dotenv = require('dotenv');
 const db = require('./db');
 const ollama = require('./ollama');
@@ -12,7 +11,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
-app.use(bodyParser.json({ limit: '50mb' }));
+app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, '../client')));
 
 app.get('/api/models', async (req, res) => {
@@ -48,7 +47,14 @@ app.get('/api/sessions/:id/messages', (req, res) => {
 app.post('/api/messages', (req, res) => {
     try {
         const { sessionId, role, content, images } = req.body;
-        db.addMessage(sessionId, role, content, images);
+        const msg = db.addMessage(sessionId, role, content, images);
+        res.json(msg);
+    } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+app.delete('/api/messages/:sessionId/:msgId', (req, res) => {
+    try {
+        db.deleteMessage(req.params.sessionId, req.params.msgId);
         res.json({ success: true });
     } catch (error) { res.status(500).json({ error: error.message }); }
 });

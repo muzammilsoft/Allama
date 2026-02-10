@@ -10,6 +10,8 @@ let settings = {
 };
 let selectedImageBase64 = null;
 let isDarkMode = false;
+let longPressTimer = null;
+let selectedMessageData = null;
 
 const chatMessages = document.getElementById('chat-messages');
 const userInput = document.getElementById('user-input');
@@ -35,6 +37,10 @@ async function init() {
     });
     tempRange.addEventListener('input', (e) => { tempVal.textContent = e.target.value; });
     modelSelect.addEventListener('change', checkVisionSupport);
+
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('#context-menu')) hideContextMenu();
+    });
 }
 
 async function fetchModels() {
@@ -114,18 +120,21 @@ async function sendMessage() {
         images: selectedImageBase64 ? [selectedImageBase64.split(',')[1]] : null
     };
 
-    currentMessages.push({ ...userMsg, content: text, images: selectedImageBase64 ? [selectedImageBase64] : null });
+    const displayMsg = { ...userMsg, content: text, images: selectedImageBase64 ? [selectedImageBase64] : null };
+    currentMessages.push(displayMsg);
     renderMessages();
     userInput.value = '';
     autoResizeTextarea();
-    const tempImg = selectedImageBase64;
     removeImage();
 
-    await fetch('/api/messages', {
+    // Save User Message
+    const userRes = await fetch('/api/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId: currentSessionId, role: 'user', content: text, images: userMsg.images ? JSON.stringify(userMsg.images) : null })
     });
+    const savedUserMsg = await userRes.json();
+    displayMsg.id = savedUserMsg.id;
 
     if (currentMessages.length === 1 || (currentMessages.length === 2 && currentMessages[0].role === 'user')) {
         const title = text.substring(0, 30) + (text.length > 30 ? '...' : '');
@@ -135,8 +144,6 @@ async function sendMessage() {
 
     try {
         sendBtn.disabled = true;
-
-        // Show loading animation in a new message bubble
         const aiMsgIndex = currentMessages.length;
         currentMessages.push({ role: 'assistant', content: '', loading: true });
         renderMessages();
@@ -165,25 +172,20 @@ async function sendMessage() {
 
         if (!res.ok) {
             const errorData = await res.json();
-            throw new Error(errorData.error || 'حدث خطأ غير معروف');
+            throw new Error(errorData.error || 'حدث خطأ');
         }
 
         if (settings.streamEnabled) {
             const reader = res.body.getReader();
             const decoder = new TextDecoder();
             let aiContent = "";
-            let fullResponse = "";
-
-            // Remove loading state
             currentMessages[aiMsgIndex].loading = false;
 
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
-
                 const chunk = decoder.decode(value, { stream: true });
                 const lines = chunk.split('\n');
-
                 for (const line of lines) {
                     if (!line.trim()) continue;
                     try {
@@ -193,32 +195,32 @@ async function sendMessage() {
                             currentMessages[aiMsgIndex].content = aiContent;
                             renderMessages();
                         }
-                    } catch (e) { console.error("Error parsing chunk", e); }
+                    } catch (e) {}
                 }
             }
-
-            // Save final message to DB
-            await fetch('/api/messages', {
+            const aiSaveRes = await fetch('/api/messages', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ sessionId: currentSessionId, role: 'assistant', content: aiContent })
             });
-
+            const savedAiMsg = await aiSaveRes.json();
+            currentMessages[aiMsgIndex].id = savedAiMsg.id;
         } else {
             const data = await res.json();
             if (data.message) {
-                currentMessages[aiMsgIndex] = data.message;
+                currentMessages[aiMsgIndex] = { ...data.message, loading: false };
                 renderMessages();
+                // Fetch last message to get its ID (since backend saves it)
+                const lastMsgsRes = await fetch(`/api/sessions/${currentSessionId}/messages`);
+                const lastMsgs = await lastMsgsRes.json();
+                if (lastMsgs.length > 0) currentMessages[aiMsgIndex].id = lastMsgs[lastMsgs.length - 1].id;
             }
         }
     } catch (err) {
         console.error('Chat error:', err);
-        if (currentMessages.length > 0 && currentMessages[currentMessages.length - 1].loading) {
-            currentMessages.pop(); // remove loading message
-        }
-        appendErrorMessage(err.message || 'عذراً، حدث خطأ أثناء الاتصال بالنموذج.');
-    }
-    finally { sendBtn.disabled = false; }
+        if (currentMessages[currentMessages.length - 1].loading) currentMessages.pop();
+        appendErrorMessage(err.message || 'خطأ في الاتصال');
+    } finally { sendBtn.disabled = false; }
 }
 
 function renderMessages() {
@@ -228,51 +230,38 @@ function renderMessages() {
     }
     chatMessages.innerHTML = currentMessages.map((msg, index) => {
         if (msg.role === 'tool') return '';
-
-        // Handle tool execution placeholder
         if (msg.role === 'assistant' && msg.content && msg.content.startsWith('[{"function":')) {
             return `<div class="flex justify-start"><div class="max-w-[85%] text-gray-400 text-xs italic"><i class="fas fa-cog fa-spin ml-1"></i> جاري استخدام الأدوات...</div></div>`;
         }
-
         const isUser = msg.role === 'user';
-
         let contentHtml = '';
         if (msg.loading) {
             contentHtml = `<div class="flex items-center space-x-2 py-2"><div class="dot-flashing"></div></div>`;
         } else {
             let content = msg.content || '';
             let thinking = '';
-
-            // Detect thinking (experimental for models like DeepSeek or LFM)
             if (settings.thinkingEnabled) {
                 const thoughtMatch = content.match(/<thought>([\s\S]*?)<\/thought>/);
                 if (thoughtMatch) {
                     thinking = `<div class="thinking-block">${marked.parse(thoughtMatch[1])}</div>`;
                     content = content.replace(/<thought>[\s\S]*?<\/thought>/, '');
-                } else if (content.includes('Thinking:') || content.includes('التفكير:')) {
-                    // Simple heuristic for some models
-                    const parts = content.split('\n\n');
-                    if (parts.length > 1 && (parts[0].includes('Thinking') || parts[0].length < 200)) {
-                         // This is very loose, better stick to tags if possible
-                    }
                 }
-            } else {
-                // Hide thinking if disabled
-                content = content.replace(/<thought>[\s\S]*?<\/thought>/, '');
-            }
-
+            } else { content = content.replace(/<thought>[\s\S]*?<\/thought>/, ''); }
             contentHtml = thinking + DOMPurify.sanitize(marked.parse(content));
         }
-
         let imagesHtml = '';
         if (msg.images) {
             const imgs = typeof msg.images === 'string' ? JSON.parse(msg.images) : msg.images;
             imagesHtml = `<div class="flex gap-2 mb-2 flex-wrap">${imgs.map(img => `<img src="${img.startsWith('data:') ? img : 'data:image/jpeg;base64,' + img}" class="h-40 rounded-xl shadow-sm border border-gray-100 dark:border-zinc-800">`).join('')}</div>`;
         }
-
         return `
             <div class="flex ${isUser ? 'justify-start' : 'justify-end'} group">
-                <div class="max-w-[90%] md:max-w-[80%] ${isUser ? 'bg-black text-white dark:bg-white dark:text-black rounded-2xl rounded-bl-none shadow-md' : 'bg-white text-gray-900 dark:bg-zinc-900 dark:text-gray-100 border border-gray-100 dark:border-zinc-800 rounded-2xl rounded-br-none'} p-4">
+                <div
+                    onmousedown="startLongPress(event, ${index})"
+                    ontouchstart="startLongPress(event, ${index})"
+                    onmouseup="cancelLongPress()"
+                    ontouchend="cancelLongPress()"
+                    class="message-bubble ${isUser ? 'user-message-bubble bg-black text-white dark:bg-white dark:text-black rounded-2xl rounded-bl-none shadow-md' : 'ai-message-bubble bg-white text-gray-900 dark:bg-zinc-900 dark:text-gray-100 border border-gray-100 dark:border-zinc-800 rounded-2xl rounded-br-none'} max-w-[90%] md:max-w-[80%] cursor-pointer active:scale-[0.98] transition-transform p-4">
                     ${imagesHtml}
                     <div class="markdown-content text-sm md:text-base leading-relaxed">
                         ${isUser ? escapeHtml(msg.content) : contentHtml}
@@ -291,21 +280,13 @@ function appendErrorMessage(text) {
 }
 
 function toggleSidebar(show) {
-    if (show === undefined) {
-        const isHidden = sidebar.classList.contains('translate-x-full');
-        toggleSidebar(isHidden);
-    } else if (show) {
-        sidebar.classList.remove('translate-x-full');
-        sidebarOverlay.classList.remove('hidden');
-    } else {
-        sidebar.classList.add('translate-x-full');
-        sidebarOverlay.classList.add('hidden');
-    }
+    if (show === undefined) { const isHidden = sidebar.classList.contains('translate-x-full'); toggleSidebar(isHidden); }
+    else if (show) { sidebar.classList.remove('translate-x-full'); sidebarOverlay.classList.remove('hidden'); }
+    else { sidebar.classList.add('translate-x-full'); sidebarOverlay.classList.add('hidden'); }
 }
 
 function autoResizeTextarea() {
-    userInput.style.height = 'auto';
-    userInput.style.height = (userInput.scrollHeight) + 'px';
+    userInput.style.height = 'auto'; userInput.style.height = (userInput.scrollHeight) + 'px';
 }
 
 function toggleDarkMode() {
@@ -375,6 +356,56 @@ async function addNewModel() {
 
 function escapeHtml(text) {
     const div = document.createElement('div'); div.textContent = text; return div.innerHTML;
+}
+
+// Long Press & Context Menu Logic
+function startLongPress(e, index) {
+    cancelLongPress();
+    selectedMessageData = { index, event: e };
+    longPressTimer = setTimeout(() => {
+        showContextMenu(e, index);
+    }, 600);
+}
+
+function cancelLongPress() {
+    if (longPressTimer) clearTimeout(longPressTimer);
+}
+
+function showContextMenu(e, index) {
+    const menu = document.getElementById('context-menu');
+    const msg = currentMessages[index];
+    if (!msg) return;
+    const x = e.touches ? e.touches[0].clientX : e.clientX;
+    const y = e.touches ? e.touches[0].clientY : e.clientY;
+    menu.style.left = `${x}px`;
+    menu.style.top = `${y}px`;
+    menu.classList.remove('hidden');
+    e.preventDefault();
+}
+
+function hideContextMenu() {
+    document.getElementById('context-menu').classList.add('hidden');
+}
+
+async function copyMessage() {
+    if (selectedMessageData === null) return;
+    const msg = currentMessages[selectedMessageData.index];
+    if (msg) await navigator.clipboard.writeText(msg.content);
+    hideContextMenu();
+}
+
+async function deleteMessageUI() {
+    if (selectedMessageData === null) return;
+    const index = selectedMessageData.index;
+    const msg = currentMessages[index];
+    if (confirm('هل تريد حذف هذه الرسالة؟')) {
+        currentMessages.splice(index, 1);
+        renderMessages();
+        if (currentSessionId && msg.id) {
+            await fetch(`/api/messages/${currentSessionId}/${msg.id}`, { method: 'DELETE' });
+        }
+    }
+    hideContextMenu();
 }
 
 init();

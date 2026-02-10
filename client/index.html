@@ -4,15 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>علّامة - Allama</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+    <script src="lib/tailwind.js"></script>
+    <link rel="stylesheet" href="lib/fontawesome.min.css">
+    <script src="lib/marked.min.js"></script>
+    <script src="lib/purify.min.js"></script>
+    <link rel="stylesheet" href="lib/github-dark.min.css">
+    <script src="lib/highlight.min.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap');
-        body { font-family: 'Cairo', sans-serif; }
+        body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif; }
         .markdown-content pre { background: #f3f4f6; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; border: 1px solid #e5e7eb; }
         .dark .markdown-content pre { background: #111827; border-color: #374151; }
         .markdown-content code { font-family: monospace; }
@@ -219,6 +218,18 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- Context Menu -->
+    <div id="context-menu" class="hidden fixed z-[70] bg-white dark:bg-zinc-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-2xl py-2 w-48 overflow-hidden backdrop-blur-md">
+        <button onclick="copyMessage()" class="w-full text-right px-4 py-3 hover:bg-gray-100 dark:hover:bg-zinc-800 flex items-center gap-3 transition-colors">
+            <i class="far fa-copy text-gray-400"></i>
+            <span>نسخ النص</span>
+        </button>
+        <button onclick="deleteMessageUI()" class="w-full text-right px-4 py-3 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 flex items-center gap-3 transition-colors">
+            <i class="far fa-trash-alt text-red-400"></i>
+            <span>حذف الرسالة</span>
+        </button>
     </div>
 
     <script src="app.js"></script>

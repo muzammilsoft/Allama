@@ -62,7 +62,7 @@ module.exports = {
     addMessage: (sessionId, role, content, images = null) => {
         const db = readDB();
         const newMessage = {
-            id: Date.now() + Math.random(),
+            id: String(Date.now() + Math.random()),
             session_id: sessionId,
             role,
             content,
@@ -71,7 +71,7 @@ module.exports = {
         };
         db.messages.push(newMessage);
         writeDB(db);
-        return { changes: 1 };
+        return newMessage;
     },
     updateSessionTitle: (id, title) => {
         const db = readDB();
@@ -80,6 +80,12 @@ module.exports = {
             session.title = title;
             writeDB(db);
         }
+        return { changes: 1 };
+    },
+    deleteMessage: (sessionId, messageId) => {
+        const db = readDB();
+        db.messages = db.messages.filter(m => !(m.session_id === sessionId && String(m.id) === String(messageId)));
+        writeDB(db);
         return { changes: 1 };
     }
 };
