@@ -163,6 +163,11 @@ async function sendMessage() {
             })
         });
 
+        if (!res.ok) {
+            const errorData = await res.json();
+            throw new Error(errorData.error || 'حدث خطأ غير معروف');
+        }
+
         if (settings.streamEnabled) {
             const reader = res.body.getReader();
             const decoder = new TextDecoder();
@@ -208,8 +213,10 @@ async function sendMessage() {
         }
     } catch (err) {
         console.error('Chat error:', err);
-        currentMessages.pop(); // remove loading message
-        appendErrorMessage('عذراً، حدث خطأ أثناء الاتصال بالنموذج.');
+        if (currentMessages.length > 0 && currentMessages[currentMessages.length - 1].loading) {
+            currentMessages.pop(); // remove loading message
+        }
+        appendErrorMessage(err.message || 'عذراً، حدث خطأ أثناء الاتصال بالنموذج.');
     }
     finally { sendBtn.disabled = false; }
 }

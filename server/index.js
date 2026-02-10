@@ -55,14 +55,30 @@ app.post('/api/messages', (req, res) => {
 
 app.post('/api/chat', async (req, res) => {
     const { sessionId, model, messages, options, toolsEnabled, stream } = req.body;
+    let currentTools = toolsEnabled ? tools.toolsDefinition : [];
+
     try {
         let currentMessages = [...messages];
         let toolCallsMade = 0;
         const MAX_TOOL_CALLS = 5;
 
-        // Tool calling loop (always non-streaming for intermediate steps)
         while (toolCallsMade < MAX_TOOL_CALLS) {
-            const ollamaRes = await ollama.chat(model, currentMessages, options, toolsEnabled ? tools.toolsDefinition : [], false);
+            let ollamaRes;
+            try {
+                ollamaRes = await ollama.chat(model, currentMessages, options, currentTools, false);
+            } catch (error) {
+                // If model doesn't support tools, retry once without tools
+                const errorData = error.response ? error.response.data : {};
+                const errorMessage = typeof errorData === 'string' ? errorData : (errorData.error || error.message);
+
+                if (errorMessage.includes('does not support tools') && currentTools.length > 0) {
+                    console.log(`Model ${model} does not support tools. Retrying without tools...`);
+                    currentTools = [];
+                    continue; // Retry the loop with currentTools empty
+                }
+                throw error; // Re-throw if it's another error
+            }
+
             const response = ollamaRes.data;
 
             if (response.message.tool_calls && response.message.tool_calls.length > 0) {
@@ -81,7 +97,6 @@ app.post('/api/chat', async (req, res) => {
                 }
                 toolCallsMade++;
             } else {
-                // No more tool calls, proceed to final response (maybe streaming)
                 if (stream) {
                     const streamRes = await ollama.chat(model, currentMessages, options, [], true);
                     res.setHeader('Content-Type', 'application/x-ndjson');
@@ -96,7 +111,8 @@ app.post('/api/chat', async (req, res) => {
         res.status(500).json({ error: 'Too many tool calls' });
     } catch (error) {
         console.error('Chat Error:', error);
-        res.status(500).json({ error: error.message });
+        const errorMsg = error.response ? (error.response.data.error || JSON.stringify(error.response.data)) : error.message;
+        res.status(error.response ? error.response.status : 500).json({ error: errorMsg });
     }
 });
 

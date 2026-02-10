@@ -39,6 +39,11 @@
       "id": "session_1770731690655",
       "title": "test thinking",
       "created_at": "2026-02-10T13:54:50.672Z"
+    },
+    {
+      "id": "session_1770733026236",
+      "title": "اختبار التخزين",
+      "created_at": "2026-02-10T14:17:06.257Z"
     }
   ],
   "messages": [
@@ -193,6 +198,30 @@
       "content": "<thought>أنا أفكر الآن في أفضل طريقة للرد...</thought>هذا هو الرد بعد التفكير.",
       "images": null,
       "created_at": "2026-02-10T13:54:50.783Z"
+    },
+    {
+      "id": 1770732955718.9321,
+      "session_id": "test",
+      "role": "assistant",
+      "content": "هذا رد عادي ناجح (بدون أدوات).",
+      "images": null,
+      "created_at": "2026-02-10T14:15:55.718Z"
+    },
+    {
+      "id": 1770733026339.063,
+      "session_id": "session_1770733026236",
+      "role": "user",
+      "content": "اختبار التخزين",
+      "images": null,
+      "created_at": "2026-02-10T14:17:06.339Z"
+    },
+    {
+      "id": 1770733028825.1116,
+      "session_id": "session_1770733026236",
+      "role": "assistant",
+      "content": "هذا رد متدفق ناجح (بدون أدوات).",
+      "images": null,
+      "created_at": "2026-02-10T14:17:08.825Z"
     }
   ]
 }
