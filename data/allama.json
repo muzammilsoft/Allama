@@ -1,0 +1,27 @@
+{
+  "sessions": [
+    {
+      "id": "session_1770728521409",
+      "title": "اختبار التخزين",
+      "created_at": "2026-02-10T13:02:01.431Z"
+    }
+  ],
+  "messages": [
+    {
+      "id": 1770728521450.7976,
+      "session_id": "session_1770728521409",
+      "role": "user",
+      "content": "اختبار التخزين",
+      "images": null,
+      "created_at": "2026-02-10T13:02:01.450Z"
+    },
+    {
+      "id": 1770728521587.6514,
+      "session_id": "session_1770728521409",
+      "role": "assistant",
+      "content": "مرحباً من المحاكاة (JSON Storage)",
+      "images": null,
+      "created_at": "2026-02-10T13:02:01.587Z"
+    }
+  ]
+}
