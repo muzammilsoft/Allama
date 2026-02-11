@@ -84,6 +84,36 @@
       "id": "session_1770794441293",
       "title": "Long request test",
       "created_at": "2026-02-11T07:20:41.309Z"
+    },
+    {
+      "id": "session_1770811337703",
+      "title": "Triggering a cancel",
+      "created_at": "2026-02-11T12:02:17.733Z"
+    },
+    {
+      "id": "session_1770811391027",
+      "title": "Triggering a cancel",
+      "created_at": "2026-02-11T12:03:11.041Z"
+    },
+    {
+      "id": "session_1770811477609",
+      "title": "Triggering a cancel",
+      "created_at": "2026-02-11T12:04:37.621Z"
+    },
+    {
+      "id": "session_1770811526723",
+      "title": "Long request test",
+      "created_at": "2026-02-11T12:05:26.741Z"
+    },
+    {
+      "id": "session_1770812134599",
+      "title": "Long request test",
+      "created_at": "2026-02-11T12:15:34.615Z"
+    },
+    {
+      "id": "session_1770812141848",
+      "title": "Triggering a cancel",
+      "created_at": "2026-02-11T12:15:41.850Z"
     }
   ],
   "messages": [
@@ -374,6 +404,54 @@
       "content": "Long request test",
       "images": null,
       "created_at": "2026-02-11T07:20:41.352Z"
+    },
+    {
+      "id": "1770811337829.9695",
+      "session_id": "session_1770811337703",
+      "role": "user",
+      "content": "Triggering a cancel",
+      "images": null,
+      "created_at": "2026-02-11T12:02:17.829Z"
+    },
+    {
+      "id": "1770811391076.8286",
+      "session_id": "session_1770811391027",
+      "role": "user",
+      "content": "Triggering a cancel",
+      "images": null,
+      "created_at": "2026-02-11T12:03:11.076Z"
+    },
+    {
+      "id": "1770811477664.1294",
+      "session_id": "session_1770811477609",
+      "role": "user",
+      "content": "Triggering a cancel",
+      "images": null,
+      "created_at": "2026-02-11T12:04:37.664Z"
+    },
+    {
+      "id": "1770811526784.6765",
+      "session_id": "session_1770811526723",
+      "role": "user",
+      "content": "Long request test",
+      "images": null,
+      "created_at": "2026-02-11T12:05:26.784Z"
+    },
+    {
+      "id": "1770812134655.931",
+      "session_id": "session_1770812134599",
+      "role": "user",
+      "content": "Long request test",
+      "images": null,
+      "created_at": "2026-02-11T12:15:34.655Z"
+    },
+    {
+      "id": "1770812141882.1484",
+      "session_id": "session_1770812141848",
+      "role": "user",
+      "content": "Triggering a cancel",
+      "images": null,
+      "created_at": "2026-02-11T12:15:41.882Z"
     }
   ]
 }

@@ -186,17 +186,21 @@ async function sendMessage() {
             throw new Error(errorData.error || 'حدث خطأ');
         }
 
-        if (settings.streamEnabled) {
+        if (settings.streamEnabled && res.headers.get('Content-Type')?.includes('ndjson')) {
             const reader = res.body.getReader();
             const decoder = new TextDecoder();
             let aiContent = "";
             currentMessages[aiMsgIndex].loading = false;
+            let buffer = "";
 
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
-                const chunk = decoder.decode(value, { stream: true });
-                const lines = chunk.split('\n');
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop(); // Keep partial line in buffer
+
                 for (const line of lines) {
                     if (!line.trim()) continue;
                     try {
@@ -206,7 +210,9 @@ async function sendMessage() {
                             currentMessages[aiMsgIndex].content = aiContent;
                             renderMessages();
                         }
-                    } catch (e) {}
+                    } catch (e) {
+                        console.error("Failed to parse JSON line:", line, e);
+                    }
                 }
             }
             const aiSaveRes = await fetch('/api/messages', {
@@ -217,14 +223,18 @@ async function sendMessage() {
             const savedAiMsg = await aiSaveRes.json();
             currentMessages[aiMsgIndex].id = savedAiMsg.id;
         } else {
+            // Handle regular JSON response (non-streamed)
             const data = await res.json();
             if (data.message) {
                 currentMessages[aiMsgIndex] = { ...data.message, loading: false };
                 renderMessages();
-                // Fetch last message to get its ID (since backend saves it)
+
+                // If it was a regular response, the backend has already saved it.
+                // We just need the ID to update our local object.
                 const lastMsgsRes = await fetch(`/api/sessions/${currentSessionId}/messages`);
                 const lastMsgs = await lastMsgsRes.json();
-                if (lastMsgs.length > 0) currentMessages[aiMsgIndex].id = lastMsgs[lastMsgs.length - 1].id;
+                const matchedMsg = lastMsgs.find(m => m.role === 'assistant' && m.content === data.message.content);
+                if (matchedMsg) currentMessages[aiMsgIndex].id = matchedMsg.id;
             }
         }
     } catch (err) {

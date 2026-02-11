@@ -68,6 +68,22 @@ app.post('/api/chat', async (req, res) => {
         abortController.abort();
     });
 
+    // Optimization: If tools are disabled and stream is requested, stream directly
+    if (!toolsEnabled && stream) {
+        try {
+            const streamRes = await ollama.chat(model, messages, options, [], true, abortController.signal);
+            res.setHeader('Content-Type', 'application/x-ndjson');
+            streamRes.data.pipe(res);
+            return;
+        } catch (error) {
+            if (error.code === 'ERR_CANCELED' || error.name === 'CanceledError') {
+                return console.log('Chat request canceled by client.');
+            }
+            console.error('Streaming Chat Error:', error);
+            return res.status(500).json({ error: error.message });
+        }
+    }
+
     try {
         let currentMessages = [...messages];
         let toolCallsMade = 0;
@@ -108,22 +124,22 @@ app.post('/api/chat', async (req, res) => {
                 }
                 toolCallsMade++;
             } else {
-                if (stream) {
-                    const streamRes = await ollama.chat(model, currentMessages, options, [], true, abortController.signal);
-                    res.setHeader('Content-Type', 'application/x-ndjson');
-                    streamRes.data.pipe(res);
-                    return;
-                } else {
-                    if (sessionId && response.message) db.addMessage(sessionId, response.message.role, response.message.content);
-                    return res.json(response);
-                }
+                // No tool calls needed, we already have the response from the first call
+                if (sessionId && response.message) db.addMessage(sessionId, response.message.role, response.message.content);
+                return res.json(response);
             }
         }
         res.status(500).json({ error: 'Too many tool calls' });
     } catch (error) {
-        console.error('Chat Error:', error);
-        const errorMsg = error.response ? (error.response.data.error || JSON.stringify(error.response.data)) : error.message;
-        res.status(error.response ? error.response.status : 500).json({ error: errorMsg });
+        if (error.code === 'ERR_CANCELED' || error.name === 'CanceledError') {
+            console.log('Chat request canceled by client.');
+        } else {
+            console.error('Chat Error:', error);
+            if (!res.headersSent) {
+                const errorMsg = error.response ? (error.response.data.error || JSON.stringify(error.response.data)) : error.message;
+                res.status(error.response ? error.response.status : 500).json({ error: errorMsg });
+            }
+        }
     }
 });
 

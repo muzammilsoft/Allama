@@ -30,7 +30,9 @@ async function chat(model, messages, options = {}, tools = [], stream = false, s
         });
         return response;
     } catch (error) {
-        console.error('Ollama API Error:', error.response ? error.response.data : error.message);
+        if (error.code !== 'ERR_CANCELED' && error.name !== 'CanceledError') {
+            console.error('Ollama API Error:', error.response ? error.response.data : error.message);
+        }
         throw error;
     }
 }
