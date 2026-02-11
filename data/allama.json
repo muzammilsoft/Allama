@@ -74,6 +74,16 @@
       "id": "session_1770754143255",
       "title": "Test Context Menu",
       "created_at": "2026-02-10T20:09:03.258Z"
+    },
+    {
+      "id": "session_1770794378351",
+      "title": "Long request test",
+      "created_at": "2026-02-11T07:19:38.377Z"
+    },
+    {
+      "id": "session_1770794441293",
+      "title": "Long request test",
+      "created_at": "2026-02-11T07:20:41.309Z"
     }
   ],
   "messages": [
@@ -348,6 +358,22 @@
       "content": "هذا رد متدفق ناجح (بدون أدوات).",
       "images": null,
       "created_at": "2026-02-10T20:09:03.382Z"
+    },
+    {
+      "id": "1770794378420.8364",
+      "session_id": "session_1770794378351",
+      "role": "user",
+      "content": "Long request test",
+      "images": null,
+      "created_at": "2026-02-11T07:19:38.420Z"
+    },
+    {
+      "id": "1770794441352.6157",
+      "session_id": "session_1770794441293",
+      "role": "user",
+      "content": "Long request test",
+      "images": null,
+      "created_at": "2026-02-11T07:20:41.352Z"
     }
   ]
 }

@@ -62,6 +62,11 @@ app.delete('/api/messages/:sessionId/:msgId', (req, res) => {
 app.post('/api/chat', async (req, res) => {
     const { sessionId, model, messages, options, toolsEnabled, stream } = req.body;
     let currentTools = toolsEnabled ? tools.toolsDefinition : [];
+    const abortController = new AbortController();
+
+    req.on('close', () => {
+        abortController.abort();
+    });
 
     try {
         let currentMessages = [...messages];
@@ -71,7 +76,7 @@ app.post('/api/chat', async (req, res) => {
         while (toolCallsMade < MAX_TOOL_CALLS) {
             let ollamaRes;
             try {
-                ollamaRes = await ollama.chat(model, currentMessages, options, currentTools, false);
+                ollamaRes = await ollama.chat(model, currentMessages, options, currentTools, false, abortController.signal);
             } catch (error) {
                 // If model doesn't support tools, retry once without tools
                 const errorData = error.response ? error.response.data : {};
@@ -104,7 +109,7 @@ app.post('/api/chat', async (req, res) => {
                 toolCallsMade++;
             } else {
                 if (stream) {
-                    const streamRes = await ollama.chat(model, currentMessages, options, [], true);
+                    const streamRes = await ollama.chat(model, currentMessages, options, [], true, abortController.signal);
                     res.setHeader('Content-Type', 'application/x-ndjson');
                     streamRes.data.pipe(res);
                     return;

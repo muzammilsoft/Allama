@@ -8,7 +8,7 @@ const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const httpAgent = new http.Agent({ keepAlive: true });
 const httpsAgent = new https.Agent({ keepAlive: true });
 
-async function chat(model, messages, options = {}, tools = [], stream = false) {
+async function chat(model, messages, options = {}, tools = [], stream = false, signal = null) {
     const payload = {
         model,
         messages,
@@ -25,6 +25,7 @@ async function chat(model, messages, options = {}, tools = [], stream = false) {
             responseType: stream ? 'stream' : 'json',
             httpAgent,
             httpsAgent,
+            signal,
             headers: { 'Connection': 'keep-alive' }
         });
         return response;

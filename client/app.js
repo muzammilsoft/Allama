@@ -12,6 +12,8 @@ let selectedImageBase64 = null;
 let isDarkMode = false;
 let longPressTimer = null;
 let selectedMessageData = null;
+let chatAbortController = null;
+let isGenerating = false;
 
 const chatMessages = document.getElementById('chat-messages');
 const userInput = document.getElementById('user-input');
@@ -110,9 +112,17 @@ async function deleteSession(id) {
 }
 
 async function sendMessage() {
+    if (isGenerating) {
+        stopResponse();
+        return;
+    }
+
     const text = userInput.value.trim();
     if (!text && !selectedImageBase64) return;
     if (!currentSessionId) await newChat();
+
+    isGenerating = true;
+    updateSendButtonUI();
 
     const userMsg = {
         role: 'user',
@@ -143,7 +153,7 @@ async function sendMessage() {
     }
 
     try {
-        sendBtn.disabled = true;
+        chatAbortController = new AbortController();
         const aiMsgIndex = currentMessages.length;
         currentMessages.push({ role: 'assistant', content: '', loading: true });
         renderMessages();
@@ -160,6 +170,7 @@ async function sendMessage() {
         const res = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            signal: chatAbortController.signal,
             body: JSON.stringify({
                 sessionId: currentSessionId,
                 model: modelSelect.value,
@@ -217,10 +228,44 @@ async function sendMessage() {
             }
         }
     } catch (err) {
-        console.error('Chat error:', err);
-        if (currentMessages[currentMessages.length - 1].loading) currentMessages.pop();
-        appendErrorMessage(err.message || 'خطأ في الاتصال');
-    } finally { sendBtn.disabled = false; }
+        if (err.name === 'AbortError') {
+            console.log('Request aborted');
+        } else {
+            console.error('Chat error:', err);
+            if (currentMessages[currentMessages.length - 1].loading) currentMessages.pop();
+            appendErrorMessage(err.message || 'خطأ في الاتصال');
+        }
+    } finally {
+        isGenerating = false;
+        chatAbortController = null;
+        updateSendButtonUI();
+    }
+}
+
+function stopResponse() {
+    if (chatAbortController) {
+        chatAbortController.abort();
+        isGenerating = false;
+        chatAbortController = null;
+        if (currentMessages.length > 0 && currentMessages[currentMessages.length - 1].loading) {
+            currentMessages.pop();
+            renderMessages();
+        }
+        updateSendButtonUI();
+    }
+}
+
+function updateSendButtonUI() {
+    const icon = sendBtn.querySelector('i');
+    if (isGenerating) {
+        icon.classList.replace('fa-paper-plane', 'fa-stop');
+        sendBtn.classList.add('bg-red-500');
+        sendBtn.classList.remove('bg-black', 'dark:bg-white');
+    } else {
+        icon.classList.replace('fa-stop', 'fa-paper-plane');
+        sendBtn.classList.remove('bg-red-500');
+        sendBtn.classList.add('bg-black', 'dark:bg-white');
+    }
 }
 
 function renderMessages() {
@@ -241,12 +286,12 @@ function renderMessages() {
             let content = msg.content || '';
             let thinking = '';
             if (settings.thinkingEnabled) {
-                const thoughtMatch = content.match(/<thought>([\s\S]*?)<\/thought>/);
+                const thoughtMatch = content.match(/<(thought|think)>([\s\S]*?)<\/(thought|think)>/);
                 if (thoughtMatch) {
-                    thinking = `<div class="thinking-block">${marked.parse(thoughtMatch[1])}</div>`;
-                    content = content.replace(/<thought>[\s\S]*?<\/thought>/, '');
+                    thinking = `<div class="thinking-block">${marked.parse(thoughtMatch[2])}</div>`;
+                    content = content.replace(/<(thought|think)>([\s\S]*?)<\/(thought|think)>/, '');
                 }
-            } else { content = content.replace(/<thought>[\s\S]*?<\/thought>/, ''); }
+            } else { content = content.replace(/<(thought|think)>([\s\S]*?)<\/(thought|think)>/g, ''); }
             contentHtml = thinking + DOMPurify.sanitize(marked.parse(content));
         }
         let imagesHtml = '';
