@@ -1,0 +1,7 @@
+Server is running on http://localhost:3000
+Ollama API Error: { error: 'model does not support tools' }
+Model bad-model does not support tools. Retrying without tools...
+Ollama API Error: { error: 'model does not support tools' }
+Chat Error: Request failed with status code 400
+Status: 400
+Data: {"error":"model does not support tools"}

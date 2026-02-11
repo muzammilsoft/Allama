@@ -64,8 +64,10 @@ app.post('/api/chat', async (req, res) => {
     let currentTools = toolsEnabled ? tools.toolsDefinition : [];
     const abortController = new AbortController();
 
-    req.on('close', () => {
-        abortController.abort();
+    res.on('close', () => {
+        if (!res.writableEnded) {
+            abortController.abort();
+        }
     });
 
     // Optimization: If tools are disabled and stream is requested, stream directly
@@ -79,7 +81,11 @@ app.post('/api/chat', async (req, res) => {
             if (error.code === 'ERR_CANCELED' || error.name === 'CanceledError') {
                 return console.log('Chat request canceled by client.');
             }
-            console.error('Streaming Chat Error:', error);
+            console.error('Streaming Chat Error:', error.message);
+            if (error.response) {
+                console.error('Status:', error.response.status);
+                console.error('Data:', JSON.stringify(error.response.data));
+            }
             return res.status(500).json({ error: error.message });
         }
     }
@@ -134,7 +140,11 @@ app.post('/api/chat', async (req, res) => {
         if (error.code === 'ERR_CANCELED' || error.name === 'CanceledError') {
             console.log('Chat request canceled by client.');
         } else {
-            console.error('Chat Error:', error);
+            console.error('Chat Error:', error.message);
+            if (error.response) {
+                console.error('Status:', error.response.status);
+                console.error('Data:', JSON.stringify(error.response.data));
+            }
             if (!res.headersSent) {
                 const errorMsg = error.response ? (error.response.data.error || JSON.stringify(error.response.data)) : error.message;
                 res.status(error.response ? error.response.status : 500).json({ error: errorMsg });

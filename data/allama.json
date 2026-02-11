@@ -114,6 +114,21 @@
       "id": "session_1770812141848",
       "title": "Triggering a cancel",
       "created_at": "2026-02-11T12:15:41.850Z"
+    },
+    {
+      "id": "session_1770818317267",
+      "title": "Hi",
+      "created_at": "2026-02-11T13:58:37.289Z"
+    },
+    {
+      "id": "session_1770818412858",
+      "title": "Long request",
+      "created_at": "2026-02-11T14:00:12.869Z"
+    },
+    {
+      "id": "session_1770818531220",
+      "title": "Trigger 400",
+      "created_at": "2026-02-11T14:02:11.232Z"
     }
   ],
   "messages": [
@@ -452,6 +467,38 @@
       "content": "Triggering a cancel",
       "images": null,
       "created_at": "2026-02-11T12:15:41.882Z"
+    },
+    {
+      "id": "1770818317329.6738",
+      "session_id": "session_1770818317267",
+      "role": "user",
+      "content": "Hi",
+      "images": null,
+      "created_at": "2026-02-11T13:58:37.329Z"
+    },
+    {
+      "id": "1770818317429.0435",
+      "session_id": "session_1770818317267",
+      "role": "assistant",
+      "content": "Hello from mock Ollama!",
+      "images": null,
+      "created_at": "2026-02-11T13:58:37.429Z"
+    },
+    {
+      "id": "1770818412901.2366",
+      "session_id": "session_1770818412858",
+      "role": "user",
+      "content": "Long request",
+      "images": null,
+      "created_at": "2026-02-11T14:00:12.901Z"
+    },
+    {
+      "id": "1770818531263.8928",
+      "session_id": "session_1770818531220",
+      "role": "user",
+      "content": "Trigger 400",
+      "images": null,
+      "created_at": "2026-02-11T14:02:11.263Z"
     }
   ]
 }
