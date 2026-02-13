@@ -50,7 +50,25 @@ async function listModels() {
     }
 }
 
+async function loadModel(model) {
+    try {
+        await axios.post(`${OLLAMA_URL}/api/generate`, {
+            model,
+            prompt: "",
+            keep_alive: "5m"
+        }, {
+            httpAgent,
+            httpsAgent
+        });
+        return { success: true };
+    } catch (error) {
+        console.error('Ollama Load Model Error:', error.message);
+        throw error;
+    }
+}
+
 module.exports = {
     chat,
-    listModels
+    listModels,
+    loadModel
 };

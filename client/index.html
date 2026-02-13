@@ -94,10 +94,18 @@
         <aside id="sidebar" class="fixed inset-y-0 right-0 z-50 w-72 bg-white dark:bg-black border-l border-gray-200 dark:border-gray-800 transform translate-x-full transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0">
             <div class="flex flex-col h-full">
                 <div class="p-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
-                    <h2 class="text-xl font-bold">المحادثات</h2>
-                    <button onclick="newChat()" class="p-2 bg-black dark:bg-white text-white dark:text-black rounded-lg hover:opacity-80">
-                        <i class="fas fa-plus"></i>
-                    </button>
+                    <h2 class="text-lg font-bold">علّامة</h2>
+                    <div class="flex gap-1">
+                        <button onclick="openAgentStudio()" class="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-900 rounded" title="استوديو الوكلاء">
+                            <i class="fas fa-robot text-xs"></i>
+                        </button>
+                        <button onclick="openSettings()" class="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-900 rounded" title="الإعدادات">
+                            <i class="fas fa-cog text-xs"></i>
+                        </button>
+                        <button onclick="newChat()" class="p-2 bg-black dark:bg-white text-white dark:text-black rounded-lg hover:opacity-80">
+                            <i class="fas fa-plus text-xs"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="p-4 border-b border-gray-200 dark:border-gray-800">
                     <h3 class="text-[10px] font-bold text-gray-400 uppercase mb-2">الوكلاء (Agents)</h3>
@@ -134,18 +142,12 @@
                         OLLAMA <span class="text-gray-400 font-light">علّامة</span>
                     </h1>
                 </div>
-                <div class="flex items-center gap-1 md:gap-2">
-                    <select id="model-select" class="bg-gray-50 dark:bg-zinc-900 border border-gray-300 dark:border-gray-800 text-gray-900 dark:text-gray-100 text-sm rounded-lg focus:ring-black focus:border-black block p-2 max-w-[120px] md:max-w-none">
+                <div class="flex items-center gap-1">
+                    <select id="model-select" class="bg-gray-50 dark:bg-zinc-900 border border-gray-300 dark:border-gray-800 text-gray-900 dark:text-gray-100 text-xs md:text-sm rounded-lg focus:ring-black focus:border-black block p-1 md:p-2 max-w-[100px] md:max-w-none">
                         <option value="">...</option>
                     </select>
-                    <button onclick="openAgentStudio()" class="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-900 rounded" title="استوديو الوكلاء">
-                        <i class="fas fa-robot"></i>
-                    </button>
                     <button onclick="toggleDarkMode()" class="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-900 rounded" title="الوضع الليلي">
                         <i id="dark-mode-icon" class="fas fa-moon"></i>
-                    </button>
-                    <button onclick="openSettings()" class="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-900 rounded" title="الإعدادات">
-                        <i class="fas fa-cog"></i>
                     </button>
                 </div>
             </header>

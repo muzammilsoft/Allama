@@ -19,6 +19,15 @@ app.get('/api/models', async (req, res) => {
     catch (error) { res.status(500).json({ error: error.message }); }
 });
 
+app.post('/api/models/load', async (req, res) => {
+    try {
+        const { model } = req.body;
+        await ollama.loadModel(model);
+        res.json({ success: true });
+    }
+    catch (error) { res.status(500).json({ error: error.message }); }
+});
+
 app.get('/api/sessions', (req, res) => {
     try { res.json(db.getSessions()); }
     catch (error) { res.status(500).json({ error: error.message }); }
@@ -147,6 +156,9 @@ app.post('/api/chat', async (req, res) => {
             }
 
             const response = ollamaRes.data;
+            if (!response || !response.message) {
+                throw new Error('Invalid response from Ollama');
+            }
 
             if (response.message.tool_calls && response.message.tool_calls.length > 0) {
                 if (sessionId) db.addMessage(sessionId, response.message.role, JSON.stringify(response.message.tool_calls));

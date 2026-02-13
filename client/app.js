@@ -36,6 +36,7 @@ async function init() {
     await fetchModels();
     await fetchSessions();
     await fetchAgents();
+    loadModel(modelSelect.value);
     userInput.addEventListener('input', autoResizeTextarea);
     userInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
@@ -48,6 +49,7 @@ async function init() {
         selectedAgentId = null;
         renderAgentList();
         checkVisionSupport();
+        loadModel(modelSelect.value);
     });
 
     document.addEventListener('click', (e) => {
@@ -244,6 +246,7 @@ async function sendMessage() {
                         if (json.message && json.message.content) {
                             aiContent += json.message.content;
                             currentMessages[aiMsgIndex].content = aiContent;
+                            currentMessages[aiMsgIndex].loading = false;
                             renderMessages();
                         }
                     } catch (e) {
@@ -332,12 +335,18 @@ function renderMessages() {
             let content = msg.content || '';
             let thinking = '';
             if (settings.thinkingEnabled) {
-                const thoughtMatch = content.match(/<(thought|think)>([\s\S]*?)<\/(thought|think)>/);
-                if (thoughtMatch) {
-                    thinking = `<div class="thinking-block">${marked.parse(thoughtMatch[2])}</div>`;
-                    content = content.replace(/<(thought|think)>([\s\S]*?)<\/(thought|think)>/, '');
+                const parts = content.split(/<\/(?:thought|think)>/);
+                if (parts.length > 1) {
+                    const thoughtPart = parts[0].replace(/<(?:thought|think)>/, '');
+                    thinking = `<div class="thinking-block">${DOMPurify.sanitize(marked.parse(thoughtPart))}</div>`;
+                    content = parts.slice(1).join('');
+                } else if (content.match(/<(?:thought|think)>/)) {
+                    const startMatch = content.match(/<(?:thought|think)>/);
+                    const thoughtParts = content.split(startMatch[0]);
+                    content = thoughtParts[0];
+                    thinking = `<div class="thinking-block">${DOMPurify.sanitize(marked.parse(thoughtParts[1] || ''))} <i class="fas fa-spinner fa-spin text-[10px] opacity-50"></i></div>`;
                 }
-            } else { content = content.replace(/<(thought|think)>([\s\S]*?)<\/(thought|think)>/g, ''); }
+            } else { content = content.replace(/<(?:thought|think)>[\s\S]*?<\/(?:thought|think)>/g, '').replace(/<(?:thought|think)>[\s\S]*/g, ''); }
             contentHtml = thinking + DOMPurify.sanitize(marked.parse(content));
         }
         let imagesHtml = '';
@@ -470,11 +479,23 @@ function selectAgent(id) {
             if (agent.model) {
                 modelSelect.value = agent.model;
                 checkVisionSupport();
+                loadModel(agent.model);
             }
             titleEl.innerHTML = `<span class="text-lg">${agent.icon || '🤖'}</span> <span>${agent.name}</span>`;
         }
     }
     renderAgentList();
+}
+
+async function loadModel(model) {
+    if (!model) return;
+    try {
+        await fetch('/api/models/load', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model })
+        });
+    } catch (err) { console.error('Error pre-loading model:', err); }
 }
 
 function openAgentStudio() {
