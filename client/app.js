@@ -1,6 +1,8 @@
 let currentSessionId = null;
 let currentMessages = [];
 let models = [];
+let agents = [];
+let selectedAgentId = null;
 let settings = {
     systemPrompt: 'أنت مساعد ذكي ومتعاون، تدعى "علّامة". تجيب باللغة العربية بشكل افتراضي.',
     temperature: 0.7,
@@ -33,12 +35,20 @@ async function init() {
     applyDarkMode();
     await fetchModels();
     await fetchSessions();
+    await fetchAgents();
     userInput.addEventListener('input', autoResizeTextarea);
     userInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
     });
     tempRange.addEventListener('input', (e) => { tempVal.textContent = e.target.value; });
-    modelSelect.addEventListener('change', checkVisionSupport);
+    document.getElementById('agent-temp').addEventListener('input', (e) => {
+        document.getElementById('agent-temp-val').textContent = e.target.value;
+    });
+    modelSelect.addEventListener('change', () => {
+        selectedAgentId = null;
+        renderAgentList();
+        checkVisionSupport();
+    });
 
     document.addEventListener('click', (e) => {
         if (!e.target.closest('#context-menu')) hideContextMenu();
@@ -55,7 +65,10 @@ async function fetchModels() {
 }
 
 function renderModelSelect() {
-    modelSelect.innerHTML = models.map(m => `<option value="${m.name}">${m.name}</option>`).join('') + '<option value="custom">إضافة...</option>';
+    const optionsHtml = models.map(m => `<option value="${m.name}">${m.name}</option>`).join('') + '<option value="custom">إضافة...</option>';
+    modelSelect.innerHTML = optionsHtml;
+    document.getElementById('agent-model').innerHTML = optionsHtml;
+
     const defaultModels = ['gemma3:latest', 'gemma3:270m', 'qwen2.5:latest', 'llama3:latest'];
     for (const def of defaultModels) {
         if (models.find(m => m.name === def)) { modelSelect.value = def; break; }
@@ -118,6 +131,24 @@ async function sendMessage() {
     }
 
     const text = userInput.value.trim();
+    const activeAgent = selectedAgentId ? agents.find(a => a.id === selectedAgentId) : null;
+
+    let ragContext = "";
+    if (activeAgent && activeAgent.knowledgeBase && activeAgent.knowledgeBase.length > 0) {
+        // Simple keyword-based RAG
+        const queryTerms = text.toLowerCase().split(/\s+/).filter(t => t.length > 2);
+        activeAgent.knowledgeBase.forEach(file => {
+            const lines = file.content.split('\n');
+            const relevantLines = lines.filter(line =>
+                queryTerms.some(term => line.toLowerCase().includes(term))
+            ).slice(0, 10); // Limit to 10 relevant lines per file
+
+            if (relevantLines.length > 0) {
+                ragContext += `\n[From file: ${file.name}]\n${relevantLines.join('\n')}\n`;
+            }
+        });
+    }
+
     if (!text && !selectedImageBase64) return;
     if (!currentSessionId) await newChat();
 
@@ -159,7 +190,11 @@ async function sendMessage() {
         renderMessages();
 
         const messagesForApi = [];
-        if (settings.systemPrompt) messagesForApi.push({ role: 'system', content: settings.systemPrompt });
+        let systemPrompt = activeAgent ? activeAgent.system_prompt : settings.systemPrompt;
+        if (ragContext) {
+            systemPrompt += `\n\nالمعلومات المسترجعة من القاعدة المعرفية:\n${ragContext}\nاستخدم المعلومات أعلاه للإجابة إذا كانت ذات صلة.`;
+        }
+        if (systemPrompt) messagesForApi.push({ role: 'system', content: systemPrompt });
         const history = currentMessages.slice(0, aiMsgIndex).map(m => ({
             role: m.role,
             content: m.content,
@@ -173,10 +208,11 @@ async function sendMessage() {
             signal: chatAbortController.signal,
             body: JSON.stringify({
                 sessionId: currentSessionId,
-                model: modelSelect.value,
+                model: activeAgent ? activeAgent.model : modelSelect.value,
                 messages: messagesForApi,
-                options: { temperature: parseFloat(settings.temperature) },
-                toolsEnabled: settings.toolsEnabled,
+                options: { temperature: parseFloat(activeAgent ? activeAgent.temperature : settings.temperature) },
+                toolsEnabled: activeAgent ? (activeAgent.tools && activeAgent.tools.length > 0) : settings.toolsEnabled,
+                enabledTools: activeAgent ? activeAgent.tools : null,
                 stream: settings.streamEnabled
             })
         });
@@ -398,6 +434,112 @@ function loadSettings() {
     if (saved) settings = { ...settings, ...JSON.parse(saved) };
     const savedDark = localStorage.getItem('darkMode');
     if (savedDark !== null) isDarkMode = savedDark === 'true';
+}
+
+// Agent Studio Logic
+async function fetchAgents() {
+    try {
+        const res = await fetch('/api/agents');
+        agents = await res.json();
+        renderAgentList();
+    } catch (err) { console.error('Error fetching agents:', err); }
+}
+
+function renderAgentList() {
+    const list = document.getElementById('agent-list');
+    list.innerHTML = agents.map(a => `
+        <div class="flex items-center group">
+            <button onclick="selectAgent('${a.id}')" class="flex-1 text-right p-2 rounded-lg text-sm transition-all flex items-center gap-2 ${selectedAgentId === a.id ? 'bg-black text-white dark:bg-white dark:text-black font-bold' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-900'}">
+                <span class="text-lg">${a.icon || '🤖'}</span>
+                <span class="truncate">${a.name}</span>
+            </button>
+            <button onclick="deleteAgent('${a.id}')" class="p-2 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><i class="fas fa-times text-xs"></i></button>
+        </div>
+    `).join('');
+}
+
+function selectAgent(id) {
+    const titleEl = document.getElementById('app-title');
+    if (selectedAgentId === id) {
+        selectedAgentId = null;
+        titleEl.innerHTML = `OLLAMA <span class="text-gray-400 font-light">علّامة</span>`;
+    } else {
+        selectedAgentId = id;
+        const agent = agents.find(a => a.id === id);
+        if (agent) {
+            if (agent.model) {
+                modelSelect.value = agent.model;
+                checkVisionSupport();
+            }
+            titleEl.innerHTML = `<span class="text-lg">${agent.icon || '🤖'}</span> <span>${agent.name}</span>`;
+        }
+    }
+    renderAgentList();
+}
+
+function openAgentStudio() {
+    document.getElementById('agent-modal').classList.remove('hidden');
+}
+
+function closeAgentStudio() {
+    document.getElementById('agent-modal').classList.add('hidden');
+}
+
+async function saveAgent() {
+    const name = document.getElementById('agent-name').value.trim();
+    if (!name) return alert('يرجى إدخال اسم الوكيل');
+
+    const files = document.getElementById('agent-files').files;
+    const knowledgeBase = [];
+    if (files.length > 0) {
+        for (const file of files) {
+            const content = await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.readAsText(file);
+            });
+            knowledgeBase.push({ name: file.name, content });
+        }
+    }
+
+    const newAgent = {
+        id: 'agent_' + Date.now(),
+        name,
+        icon: document.getElementById('agent-icon').value.trim() || '🤖',
+        model: document.getElementById('agent-model').value,
+        system_prompt: document.getElementById('agent-system').value,
+        temperature: document.getElementById('agent-temp').value,
+        tools: [],
+        knowledgeBase
+    };
+
+    if (document.getElementById('tool-time').checked) newAgent.tools.push('time');
+    if (document.getElementById('tool-shell').checked) newAgent.tools.push('shell');
+    if (document.getElementById('tool-web').checked) newAgent.tools.push('web');
+
+    await fetch('/api/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newAgent)
+    });
+
+    await fetchAgents();
+    closeAgentStudio();
+
+    // Reset form
+    document.getElementById('agent-name').value = '';
+    document.getElementById('agent-icon').value = '';
+    document.getElementById('agent-system').value = '';
+    document.getElementById('tool-time').checked = false;
+    document.getElementById('tool-shell').checked = false;
+    document.getElementById('tool-web').checked = false;
+}
+
+async function deleteAgent(id) {
+    if (!confirm('هل تريد حذف هذا الوكيل؟')) return;
+    await fetch(`/api/agents/${id}`, { method: 'DELETE' });
+    if (selectedAgentId === id) selectedAgentId = null;
+    await fetchAgents();
 }
 
 async function addNewModel() {

@@ -59,9 +59,40 @@ app.delete('/api/messages/:sessionId/:msgId', (req, res) => {
     } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
+app.get('/api/agents', (req, res) => {
+    try { res.json(db.getAgents()); }
+    catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+app.post('/api/agents', (req, res) => {
+    try { db.createAgent(req.body); res.json({ success: true }); }
+    catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+app.put('/api/agents/:id', (req, res) => {
+    try { db.updateAgent(req.params.id, req.body); res.json({ success: true }); }
+    catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+app.delete('/api/agents/:id', (req, res) => {
+    try { db.deleteAgent(req.params.id); res.json({ success: true }); }
+    catch (error) { res.status(500).json({ error: error.message }); }
+});
+
 app.post('/api/chat', async (req, res) => {
-    const { sessionId, model, messages, options, toolsEnabled, stream } = req.body;
-    let currentTools = toolsEnabled ? tools.toolsDefinition : [];
+    const { sessionId, model, messages, options, toolsEnabled, enabledTools, stream } = req.body;
+    let currentTools = [];
+    if (Array.isArray(enabledTools)) {
+        currentTools = tools.toolsDefinition.filter(t => {
+            const toolName = t.function.name;
+            if (toolName === 'get_current_time' && enabledTools.includes('time')) return true;
+            if (toolName === 'execute_command' && enabledTools.includes('shell')) return true;
+            if (toolName === 'web_request' && enabledTools.includes('web')) return true;
+            return false;
+        });
+    } else if (toolsEnabled) {
+        currentTools = tools.toolsDefinition;
+    }
     const abortController = new AbortController();
 
     res.on('close', () => {

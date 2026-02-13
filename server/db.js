@@ -10,16 +10,18 @@ if (!fs.existsSync(path.join(__dirname, '../data'))) {
 
 // Initialize JSON file if it doesn't exist
 if (!fs.existsSync(dbPath)) {
-    fs.writeFileSync(dbPath, JSON.stringify({ sessions: [], messages: [] }, null, 2));
+    fs.writeFileSync(dbPath, JSON.stringify({ sessions: [], messages: [], agents: [] }, null, 2));
 }
 
 function readDB() {
     try {
         const data = fs.readFileSync(dbPath, 'utf8');
-        return JSON.parse(data);
+        const parsed = JSON.parse(data);
+        if (!parsed.agents) parsed.agents = [];
+        return parsed;
     } catch (error) {
         console.error('Error reading DB:', error);
-        return { sessions: [], messages: [] };
+        return { sessions: [], messages: [], agents: [] };
     }
 }
 
@@ -85,6 +87,34 @@ module.exports = {
     deleteMessage: (sessionId, messageId) => {
         const db = readDB();
         db.messages = db.messages.filter(m => !(m.session_id === sessionId && String(m.id) === String(messageId)));
+        writeDB(db);
+        return { changes: 1 };
+    },
+    getAgents: () => {
+        const db = readDB();
+        return db.agents;
+    },
+    createAgent: (agent) => {
+        const db = readDB();
+        db.agents.push({
+            ...agent,
+            created_at: new Date().toISOString()
+        });
+        writeDB(db);
+        return { changes: 1 };
+    },
+    updateAgent: (id, updatedAgent) => {
+        const db = readDB();
+        const index = db.agents.findIndex(a => a.id === id);
+        if (index !== -1) {
+            db.agents[index] = { ...db.agents[index], ...updatedAgent };
+            writeDB(db);
+        }
+        return { changes: 1 };
+    },
+    deleteAgent: (id) => {
+        const db = readDB();
+        db.agents = db.agents.filter(a => a.id !== id);
         writeDB(db);
         return { changes: 1 };
     }
