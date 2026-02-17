@@ -42,7 +42,7 @@ Allama/
 
 1. **تحميل المشروع:**
    ```bash
-   git clone <url-of-repo>
+   git clone https://github.com/muzammilsoft/Allama
    cd Allama
    ```
 
