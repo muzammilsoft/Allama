@@ -1,0 +1,14 @@
+{
+  "type": "function",
+  "function": {
+    "name": "web_request",
+    "description": "جلب محتوى من رابط ويب",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "url": { "type": "string", "description": "الرابط" }
+      },
+      "required": ["url"]
+    }
+  }
+}

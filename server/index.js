@@ -1,4 +1,5 @@
 const express = require('express');
+const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
 const dotenv = require('dotenv');
@@ -16,6 +17,11 @@ app.use(express.static(path.join(__dirname, '../client')));
 
 app.get('/api/models', async (req, res) => {
     try { res.json(await ollama.listModels()); }
+    catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+app.get('/api/plugins', (req, res) => {
+    try { res.json(tools.toolsDefinition); }
     catch (error) { res.status(500).json({ error: error.message }); }
 });
 
@@ -88,24 +94,38 @@ app.delete('/api/agents/:id', (req, res) => {
     catch (error) { res.status(500).json({ error: error.message }); }
 });
 
+app.post('/api/upload', (req, res) => {
+    try {
+        const { filename, content } = req.body; // base64 content
+        const FILES_DIR = path.join(__dirname, '../data/files');
+        if (!fs.existsSync(FILES_DIR)) fs.mkdirSync(FILES_DIR, { recursive: true });
+
+        const buffer = Buffer.from(content, 'base64');
+        fs.writeFileSync(path.join(FILES_DIR, filename), buffer);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.post('/api/chat', async (req, res) => {
     const { sessionId, model, messages, options, toolsEnabled, enabledTools, stream } = req.body;
     let currentTools = [];
+
     if (Array.isArray(enabledTools)) {
-        currentTools = tools.toolsDefinition.filter(t => {
-            const toolName = t.function.name;
-            if (toolName === 'get_current_time' && enabledTools.includes('time')) return true;
-            if (toolName === 'execute_command' && enabledTools.includes('shell')) return true;
-            if (toolName === 'web_request' && enabledTools.includes('web')) return true;
-            return false;
-        });
+        currentTools = tools.toolsDefinition.filter(t => enabledTools.includes(t.function.name));
     } else if (toolsEnabled) {
         currentTools = tools.toolsDefinition;
     }
+
+    const hasTools = currentTools.length > 0;
     const abortController = new AbortController();
 
+    if (stream) {
+        res.setHeader('Content-Type', 'application/x-ndjson');
+    }
+
     res.on('close', () => {
-        // Checking writableFinished/writableEnded to ensure the response is truly done.
         const isFinished = res.writableFinished || res.writableEnded;
         if (!isFinished) {
             console.log(`[Abort] Client closed connection before response was finished.`);
@@ -113,8 +133,7 @@ app.post('/api/chat', async (req, res) => {
         }
     });
 
-    // Optimization: If tools are disabled and stream is requested, stream directly
-    if (!toolsEnabled && stream) {
+    if (!hasTools && stream) {
         try {
             const streamRes = await ollama.chat(model, messages, options, [], true, abortController.signal);
             res.setHeader('Content-Type', 'application/x-ndjson');
@@ -125,10 +144,6 @@ app.post('/api/chat', async (req, res) => {
                 return console.log('Chat request canceled by client.');
             }
             console.error('Streaming Chat Error:', error.message);
-            if (error.response) {
-                console.error('Status:', error.response.status);
-                console.error('Data:', JSON.stringify(error.response.data));
-            }
             return res.status(500).json({ error: error.message });
         }
     }
@@ -143,29 +158,37 @@ app.post('/api/chat', async (req, res) => {
             try {
                 ollamaRes = await ollama.chat(model, currentMessages, options, currentTools, false, abortController.signal);
             } catch (error) {
-                // If model doesn't support tools, retry once without tools
                 const errorData = error.response ? error.response.data : {};
                 const errorMessage = typeof errorData === 'string' ? errorData : (errorData.error || error.message);
-
                 if (errorMessage.includes('does not support tools') && currentTools.length > 0) {
-                    console.log(`Model ${model} does not support tools. Retrying without tools...`);
                     currentTools = [];
-                    continue; // Retry the loop with currentTools empty
+                    continue;
                 }
-                throw error; // Re-throw if it's another error
+                throw error;
             }
 
             const response = ollamaRes.data;
-            if (!response || !response.message) {
-                throw new Error('Invalid response from Ollama');
-            }
+            if (!response || !response.message) throw new Error('Invalid response from Ollama');
 
             if (response.message.tool_calls && response.message.tool_calls.length > 0) {
                 if (sessionId) db.addMessage(sessionId, response.message.role, JSON.stringify(response.message.tool_calls));
                 currentMessages.push(response.message);
 
+                if (stream) {
+                    res.write(JSON.stringify(response) + '\n');
+                }
+
                 for (const toolCall of response.message.tool_calls) {
-                    const result = await tools.handleToolCall(toolCall);
+                    const toolName = toolCall.function.name;
+                    const context = {
+                        log: (message) => {
+                            if (stream && !res.writableEnded) {
+                                res.write(JSON.stringify({ status: { tool: toolName, message } }) + '\n');
+                            }
+                        }
+                    };
+
+                    const result = await tools.handleToolCall(toolCall, context);
                     const toolResponse = {
                         role: 'tool',
                         content: JSON.stringify(result),
@@ -176,21 +199,25 @@ app.post('/api/chat', async (req, res) => {
                 }
                 toolCallsMade++;
             } else {
-                // No tool calls needed, we already have the response from the first call
                 if (sessionId && response.message) db.addMessage(sessionId, response.message.role, response.message.content);
+                if (stream) {
+                    res.write(JSON.stringify(response) + '\n');
+                    return res.end();
+                }
                 return res.json(response);
             }
         }
-        res.status(500).json({ error: 'Too many tool calls' });
+        if (stream) {
+            res.write(JSON.stringify({ error: 'Too many tool calls' }) + '\n');
+            res.end();
+        } else {
+            res.status(500).json({ error: 'Too many tool calls' });
+        }
     } catch (error) {
         if (error.code === 'ERR_CANCELED' || error.name === 'CanceledError') {
             console.log('Chat request canceled by client.');
         } else {
             console.error('Chat Error:', error.message);
-            if (error.response) {
-                console.error('Status:', error.response.status);
-                console.error('Data:', JSON.stringify(error.response.data));
-            }
             if (!res.headersSent) {
                 const errorMsg = error.response ? (error.response.data.error || JSON.stringify(error.response.data)) : error.message;
                 res.status(error.response ? error.response.status : 500).json({ error: errorMsg });
@@ -203,16 +230,4 @@ app.get('/api/status', (req, res) => res.json({ status: 'running' }));
 
 const server = app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
-    console.log(`Current Project Directory: ${process.cwd()}`);
-});
-
-server.on('error', (error) => {
-    if (error.code === 'EADDRINUSE') {
-        console.error(`\n❌ Error: Port ${PORT} is already in use.`);
-        console.error(`Please stop the existing process before starting the server again.`);
-        console.error(`Try running: npm run stop\n`);
-        process.exit(1);
-    } else {
-        throw error;
-    }
 });

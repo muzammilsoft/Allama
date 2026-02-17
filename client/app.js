@@ -2,6 +2,7 @@ let currentSessionId = null;
 let currentMessages = [];
 let models = [];
 let agents = [];
+let availablePlugins = [];
 let selectedAgentId = null;
 let settings = {
     systemPrompt: 'أنت مساعد ذكي ومتعاون، تدعى "علّامة". تجيب باللغة العربية بشكل افتراضي.',
@@ -36,6 +37,7 @@ async function init() {
     await fetchModels();
     await fetchSessions();
     await fetchAgents();
+    await fetchPlugins();
     loadModel(modelSelect.value);
     userInput.addEventListener('input', autoResizeTextarea);
     userInput.addEventListener('keydown', (e) => {
@@ -137,13 +139,12 @@ async function sendMessage() {
 
     let ragContext = "";
     if (activeAgent && activeAgent.knowledgeBase && activeAgent.knowledgeBase.length > 0) {
-        // Simple keyword-based RAG
         const queryTerms = text.toLowerCase().split(/\s+/).filter(t => t.length > 2);
         activeAgent.knowledgeBase.forEach(file => {
             const lines = file.content.split('\n');
             const relevantLines = lines.filter(line =>
                 queryTerms.some(term => line.toLowerCase().includes(term))
-            ).slice(0, 10); // Limit to 10 relevant lines per file
+            ).slice(0, 10);
 
             if (relevantLines.length > 0) {
                 ragContext += `\n[From file: ${file.name}]\n${relevantLines.join('\n')}\n`;
@@ -170,7 +171,6 @@ async function sendMessage() {
     autoResizeTextarea();
     removeImage();
 
-    // Save User Message
     const userRes = await fetch('/api/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -237,12 +237,18 @@ async function sendMessage() {
 
                 buffer += decoder.decode(value, { stream: true });
                 const lines = buffer.split('\n');
-                buffer = lines.pop(); // Keep partial line in buffer
+                buffer = lines.pop();
 
                 for (const line of lines) {
                     if (!line.trim()) continue;
                     try {
                         const json = JSON.parse(line);
+                        if (json.status) {
+                            if (!currentMessages[aiMsgIndex].logs) currentMessages[aiMsgIndex].logs = [];
+                            currentMessages[aiMsgIndex].logs.push(json.status);
+                            currentMessages[aiMsgIndex].loading = false;
+                            renderMessages();
+                        }
                         if (json.message && json.message.content) {
                             aiContent += json.message.content;
                             currentMessages[aiMsgIndex].content = aiContent;
@@ -262,14 +268,10 @@ async function sendMessage() {
             const savedAiMsg = await aiSaveRes.json();
             currentMessages[aiMsgIndex].id = savedAiMsg.id;
         } else {
-            // Handle regular JSON response (non-streamed)
             const data = await res.json();
             if (data.message) {
                 currentMessages[aiMsgIndex] = { ...data.message, loading: false };
                 renderMessages();
-
-                // If it was a regular response, the backend has already saved it.
-                // We just need the ID to update our local object.
                 const lastMsgsRes = await fetch(`/api/sessions/${currentSessionId}/messages`);
                 const lastMsgs = await lastMsgsRes.json();
                 const matchedMsg = lastMsgs.find(m => m.role === 'assistant' && m.content === data.message.content);
@@ -332,6 +334,19 @@ function renderMessages() {
         if (msg.loading) {
             contentHtml = `<div class="flex items-center space-x-2 py-2"><div class="dot-flashing"></div></div>`;
         } else {
+            let activityHtml = '';
+            if (msg.logs && msg.logs.length > 0) {
+                const logs = msg.logs.map(l => `<div class="truncate"><i class="fas fa-caret-left ml-1 opacity-50"></i> ${l.message}</div>`).join('');
+                activityHtml = `
+                    <div class="bg-gray-50 dark:bg-black/40 border border-gray-100 dark:border-white/10 rounded-xl p-3 mb-3 font-mono text-[10px] text-gray-500 dark:text-gray-400">
+                        <div class="font-bold uppercase mb-1 text-[9px] flex items-center gap-1">
+                            <i class="fas fa-terminal text-blue-500"></i> نشاط الوكيل (Agent Activity)
+                        </div>
+                        ${logs}
+                    </div>
+                `;
+            }
+
             let content = msg.content || '';
             let thinking = '';
             if (settings.thinkingEnabled) {
@@ -347,7 +362,7 @@ function renderMessages() {
                     thinking = `<div class="thinking-block">${DOMPurify.sanitize(marked.parse(thoughtParts[1] || ''))} <i class="fas fa-spinner fa-spin text-[10px] opacity-50"></i></div>`;
                 }
             } else { content = content.replace(/<(?:thought|think)>[\s\S]*?<\/(?:thought|think)>/g, '').replace(/<(?:thought|think)>[\s\S]*/g, ''); }
-            contentHtml = thinking + DOMPurify.sanitize(marked.parse(content));
+            contentHtml = activityHtml + thinking + DOMPurify.sanitize(marked.parse(content));
         }
         let imagesHtml = '';
         if (msg.images) {
@@ -445,7 +460,6 @@ function loadSettings() {
     if (savedDark !== null) isDarkMode = savedDark === 'true';
 }
 
-// Agent Studio Logic
 async function fetchAgents() {
     try {
         const res = await fetch('/api/agents');
@@ -498,7 +512,40 @@ async function loadModel(model) {
     } catch (err) { console.error('Error pre-loading model:', err); }
 }
 
-function openAgentStudio() {
+async function fetchPlugins() {
+    try {
+        const res = await fetch('/api/plugins');
+        availablePlugins = await res.json();
+    } catch (err) { console.error('Error fetching plugins:', err); }
+}
+
+function renderPluginList(selectedPlugins = []) {
+    const list = document.getElementById('plugin-list');
+    list.innerHTML = availablePlugins.map(p => `
+        <div class="flex items-center gap-3 bg-gray-50 dark:bg-zinc-900 p-3 rounded-xl border border-gray-100 dark:border-gray-800">
+            <input type="checkbox" id="plugin-${p.function.name}" value="${p.function.name}" ${selectedPlugins.includes(p.function.name) ? 'checked' : ''} class="plugin-checkbox w-4 h-4 accent-black">
+            <label for="plugin-${p.function.name}" class="text-xs truncate" title="${p.function.description}">${p.function.name}</label>
+        </div>
+    `).join('');
+}
+
+function openAgentStudio(agentId = null) {
+    if (agentId && typeof agentId === 'string') {
+        const agent = agents.find(a => a.id === agentId);
+        if (agent) {
+            document.getElementById('agent-name').value = agent.name;
+            document.getElementById('agent-icon').value = agent.icon;
+            document.getElementById('agent-model').value = agent.model;
+            document.getElementById('agent-system').value = agent.system_prompt;
+            document.getElementById('agent-temp').value = agent.temperature;
+            renderPluginList(agent.tools || []);
+        }
+    } else {
+        document.getElementById('agent-name').value = '';
+        document.getElementById('agent-icon').value = '🤖';
+        document.getElementById('agent-system').value = '';
+        renderPluginList([]);
+    }
     document.getElementById('agent-modal').classList.remove('hidden');
 }
 
@@ -512,15 +559,36 @@ async function saveAgent() {
 
     const files = document.getElementById('agent-files').files;
     const knowledgeBase = [];
+    const pdfFiles = [];
+
     if (files.length > 0) {
         for (const file of files) {
-            const content = await new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onload = (e) => resolve(e.target.result);
-                reader.readAsText(file);
-            });
-            knowledgeBase.push({ name: file.name, content });
+            if (file.type === 'application/pdf') {
+                const base64 = await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve(e.target.result.split(',')[1]);
+                    reader.readAsDataURL(file);
+                });
+                await fetch('/api/upload', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filename: file.name, content: base64 })
+                });
+                pdfFiles.push(file.name);
+            } else {
+                const content = await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve(e.target.result);
+                    reader.readAsText(file);
+                });
+                knowledgeBase.push({ name: file.name, content });
+            }
         }
+    }
+
+    const selectedTools = Array.from(document.querySelectorAll('.plugin-checkbox:checked')).map(cb => cb.value);
+    if (pdfFiles.length > 0 && !selectedTools.includes('pdf_reader')) {
+        selectedTools.push('pdf_reader');
     }
 
     const newAgent = {
@@ -530,13 +598,14 @@ async function saveAgent() {
         model: document.getElementById('agent-model').value,
         system_prompt: document.getElementById('agent-system').value,
         temperature: document.getElementById('agent-temp').value,
-        tools: [],
-        knowledgeBase
+        tools: selectedTools,
+        knowledgeBase,
+        pdfFiles
     };
 
-    if (document.getElementById('tool-time').checked) newAgent.tools.push('time');
-    if (document.getElementById('tool-shell').checked) newAgent.tools.push('shell');
-    if (document.getElementById('tool-web').checked) newAgent.tools.push('web');
+    if (pdfFiles.length > 0) {
+        newAgent.system_prompt += `\n\nملفات PDF المتاحة لك: ${pdfFiles.join(', ')}. استخدم أداة 'pdf_reader' للوصول إليها.`;
+    }
 
     await fetch('/api/agents', {
         method: 'POST',
@@ -547,13 +616,11 @@ async function saveAgent() {
     await fetchAgents();
     closeAgentStudio();
 
-    // Reset form
     document.getElementById('agent-name').value = '';
-    document.getElementById('agent-icon').value = '';
+    document.getElementById('agent-icon').value = '🤖';
     document.getElementById('agent-system').value = '';
-    document.getElementById('tool-time').checked = false;
-    document.getElementById('tool-shell').checked = false;
-    document.getElementById('tool-web').checked = false;
+    document.querySelectorAll('.plugin-checkbox').forEach(cb => cb.checked = false);
+    document.getElementById('agent-files').value = '';
 }
 
 async function deleteAgent(id) {
@@ -576,7 +643,6 @@ function escapeHtml(text) {
     const div = document.createElement('div'); div.textContent = text; return div.innerHTML;
 }
 
-// Long Press & Context Menu Logic
 function startLongPress(e, index) {
     cancelLongPress();
     selectedMessageData = { index, event: e };

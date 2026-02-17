@@ -1,67 +1,68 @@
-const { exec } = require('child_process');
-const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 
-const toolsDefinition = [
-    {
-        type: 'function',
-        function: {
-            name: 'get_current_time',
-            description: 'Get the current date and time',
-            parameters: { type: 'object', properties: {} },
-        },
-    },
-    {
-        type: 'function',
-        function: {
-            name: 'execute_command',
-            description: 'Execute a system command (Use with caution!)',
-            parameters: {
-                type: 'object',
-                properties: { command: { type: 'string', description: 'The shell command to execute' } },
-                required: ['command'],
-            },
-        },
-    },
-    {
-        type: 'function',
-        function: {
-            name: 'web_request',
-            description: 'Make a simple GET web request',
-            parameters: {
-                type: 'object',
-                properties: { url: { type: 'string', description: 'The URL to fetch' } },
-                required: ['url'],
-            },
-        },
-    },
-];
+const PLUGINS_DIR = path.join(__dirname, 'plugins');
 
-const handlers = {
-    get_current_time: async () => ({ result: new Date().toLocaleString() }),
-    execute_command: async ({ command }) => {
-        return new Promise((resolve) => {
-            exec(command, (error, stdout, stderr) => {
-                if (error) resolve({ error: error.message, stderr });
-                else resolve({ stdout, stderr });
-            });
-        });
-    },
-    web_request: async ({ url }) => {
-        try {
-            const response = await axios.get(url);
-            const content = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
-            return { result: content.substring(0, 2000) };
-        } catch (error) {
-            return { error: error.message };
+let toolsDefinition = [];
+let handlers = {};
+
+function loadPlugins() {
+    toolsDefinition = [];
+    handlers = {};
+
+    if (!fs.existsSync(PLUGINS_DIR)) {
+        fs.mkdirSync(PLUGINS_DIR, { recursive: true });
+        return;
+    }
+
+    const pluginFolders = fs.readdirSync(PLUGINS_DIR);
+
+    pluginFolders.forEach(folder => {
+        const folderPath = path.join(PLUGINS_DIR, folder);
+        if (fs.statSync(folderPath).isDirectory()) {
+            const manifestPath = path.join(folderPath, 'manifest.json');
+            const indexPath = path.join(folderPath, 'index.js');
+
+            if (fs.existsSync(manifestPath) && fs.existsSync(indexPath)) {
+                try {
+                    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+                    const handler = require(indexPath);
+
+                    const toolName = manifest.function.name;
+                    toolsDefinition.push(manifest);
+                    handlers[toolName] = handler;
+
+                    console.log(`Loaded plugin: ${toolName}`);
+                } catch (err) {
+                    console.error(`Error loading plugin from ${folder}:`, err);
+                }
+            }
         }
-    },
-};
+    });
+}
 
-async function handleToolCall(toolCall) {
+// Initial load
+loadPlugins();
+
+async function handleToolCall(toolCall, context = {}) {
     const name = toolCall.function.name;
     const args = toolCall.function.arguments;
-    if (handlers[name]) return await handlers[name](args);
+
+    if (!context.log) context.log = (msg) => console.log(`[Tool:${name}] ${msg}`);
+
+    if (handlers[name]) {
+        try {
+            return await handlers[name](args, context);
+        } catch (err) {
+            context.log(`Error in tool ${name}: ${err.message}`);
+            return { error: err.message };
+        }
+    }
     return { error: `Tool ${name} not found` };
 }
 
-module.exports = { toolsDefinition, handleToolCall };
+module.exports = {
+    get toolsDefinition() { return toolsDefinition; },
+    handleToolCall,
+    loadPlugins
+};

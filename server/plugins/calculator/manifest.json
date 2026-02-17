@@ -1,0 +1,14 @@
+{
+  "type": "function",
+  "function": {
+    "name": "calculator",
+    "description": "حل المسائل الرياضية المعقدة باستخدام mathjs",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "expression": { "type": "string", "description": "التعبير الرياضي لحسابه (مثال: 2 + 2 * sqrt(16))" }
+      },
+      "required": ["expression"]
+    }
+  }
+}

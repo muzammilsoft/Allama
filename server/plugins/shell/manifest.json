@@ -1,0 +1,14 @@
+{
+  "type": "function",
+  "function": {
+    "name": "execute_command",
+    "description": "تنفيذ أوامر النظام (شل)",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "command": { "type": "string", "description": "الأمر المراد تنفيذه" }
+      },
+      "required": ["command"]
+    }
+  }
+}

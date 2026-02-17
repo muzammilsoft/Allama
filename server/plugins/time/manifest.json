@@ -1,0 +1,8 @@
+{
+  "type": "function",
+  "function": {
+    "name": "get_current_time",
+    "description": "معرفة الوقت والتاريخ الحالي",
+    "parameters": { "type": "object", "properties": {} }
+  }
+}

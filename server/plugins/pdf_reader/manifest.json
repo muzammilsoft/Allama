@@ -1,0 +1,18 @@
+{
+  "type": "function",
+  "function": {
+    "name": "pdf_reader",
+    "description": "قراءة ملفات PDF من قاعدة المعرفة",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "action": { "type": "string", "enum": ["info", "read_page", "read_range"], "description": "الإجراء المطلوب" },
+        "filename": { "type": "string", "description": "اسم الملف" },
+        "page": { "type": "number", "description": "رقم الصفحة" },
+        "start": { "type": "number", "description": "بداية القراءة" },
+        "length": { "type": "number", "description": "عدد الأحرف" }
+      },
+      "required": ["action", "filename"]
+    }
+  }
+}
