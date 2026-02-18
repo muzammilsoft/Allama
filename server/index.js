@@ -149,6 +149,7 @@ app.post('/api/chat', async (req, res) => {
     }
 
     try {
+        if (!Array.isArray(messages)) throw new Error("Messages must be an array");
         let currentMessages = [...messages];
         let toolCallsMade = 0;
         const MAX_TOOL_CALLS = 5;
@@ -161,6 +162,10 @@ app.post('/api/chat', async (req, res) => {
                 const errorData = error.response ? error.response.data : {};
                 const errorMessage = typeof errorData === 'string' ? errorData : (errorData.error || error.message);
                 if (errorMessage.includes('does not support tools') && currentTools.length > 0) {
+                    console.log(`Model ${model} does not support tools. Falling back...`);
+                    if (stream && !res.writableEnded) {
+                        res.write(JSON.stringify({ status: { message: "النموذج لا يدعم الأدوات، جاري المحاولة بدونها..." } }) + '\n');
+                    }
                     currentTools = [];
                     continue;
                 }

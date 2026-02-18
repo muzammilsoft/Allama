@@ -5,25 +5,29 @@ const dbPath = path.join(__dirname, '../data/allama.json');
 
 // Ensure data directory exists
 if (!fs.existsSync(path.join(__dirname, '../data'))) {
-    fs.mkdirSync(path.join(__dirname, '../data'));
-}
-
-// Initialize JSON file if it doesn't exist
-if (!fs.existsSync(dbPath)) {
-    fs.writeFileSync(dbPath, JSON.stringify({ sessions: [], messages: [], agents: [] }, null, 2));
+    fs.mkdirSync(path.join(__dirname, '../data'), { recursive: true });
 }
 
 function readDB() {
+    const defaultDB = { sessions: [], messages: [], agents: [] };
+    if (!fs.existsSync(dbPath)) {
+        return defaultDB;
+    }
     try {
         const data = fs.readFileSync(dbPath, 'utf8');
+        if (!data || data.trim() === "") return defaultDB;
+
         const parsed = JSON.parse(data);
-        if (!parsed.sessions) parsed.sessions = [];
-        if (!parsed.messages) parsed.messages = [];
-        if (!parsed.agents) parsed.agents = [];
-        return parsed;
+        if (!parsed || typeof parsed !== 'object') return defaultDB;
+
+        return {
+            sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
+            messages: Array.isArray(parsed.messages) ? parsed.messages : [],
+            agents: Array.isArray(parsed.agents) ? parsed.agents : []
+        };
     } catch (error) {
         console.error('Error reading DB:', error);
-        return { sessions: [], messages: [], agents: [] };
+        return defaultDB;
     }
 }
 

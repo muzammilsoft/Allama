@@ -50,7 +50,6 @@ async function init() {
     modelSelect.addEventListener('change', () => {
         selectedAgentId = null;
         renderAgentList();
-        checkVisionSupport();
         loadModel(modelSelect.value);
     });
 
@@ -77,7 +76,6 @@ function renderModelSelect() {
     for (const def of defaultModels) {
         if (models.find(m => m.name === def)) { modelSelect.value = def; break; }
     }
-    checkVisionSupport();
 }
 
 async function fetchSessions() {
@@ -137,7 +135,25 @@ async function sendMessage() {
     const text = userInput.value.trim();
     const activeAgent = selectedAgentId ? agents.find(a => a.id === selectedAgentId) : null;
 
+    // Handle Uploaded File (Session-based RAG)
+    if (selectedFileData) {
+        if (selectedFileData.type === 'application/pdf') {
+            await fetch('/api/upload', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename: selectedFileData.name, content: selectedFileData.content })
+            });
+            // Inform the assistant about the new file via a hidden message or context update
+            // For now, we'll just add it to ragContext later if we want,
+            // but the user wants it to be treated as a tool-accessible file.
+        }
+    }
+
     let ragContext = "";
+    if (selectedFileData && selectedFileData.type !== 'application/pdf') {
+        ragContext += `\n[From attached file: ${selectedFileData.name}]\n${selectedFileData.content}\n`;
+    }
+
     if (activeAgent && activeAgent.knowledgeBase && activeAgent.knowledgeBase.length > 0) {
         const queryTerms = text.toLowerCase().split(/\s+/).filter(t => t.length > 2);
         activeAgent.knowledgeBase.forEach(file => {
@@ -152,7 +168,7 @@ async function sendMessage() {
         });
     }
 
-    if (!text && !selectedImageBase64) return;
+    if (!text && !selectedImageBase64 && !selectedFileData) return;
     if (!currentSessionId) await newChat();
 
     isGenerating = true;
@@ -160,11 +176,11 @@ async function sendMessage() {
 
     const userMsg = {
         role: 'user',
-        content: text,
+        content: text + (selectedFileData && selectedFileData.type === 'application/pdf' ? `\n(لقد أرفقت ملف PDF: ${selectedFileData.name})` : ''),
         images: selectedImageBase64 ? [selectedImageBase64.split(',')[1]] : null
     };
 
-    const displayMsg = { ...userMsg, content: text, images: selectedImageBase64 ? [selectedImageBase64] : null };
+    const displayMsg = { ...userMsg, content: userMsg.content, images: selectedImageBase64 ? [selectedImageBase64] : null };
     currentMessages.push(displayMsg);
     renderMessages();
     userInput.value = '';
@@ -221,7 +237,11 @@ async function sendMessage() {
 
         if (!res.ok) {
             const errorData = await res.json();
-            throw new Error(errorData.error || 'حدث خطأ');
+            const errMsg = errorData.error || 'حدث خطأ';
+            if (errMsg.includes('does not support tools')) {
+                showToast('هذا النموذج لا يدعم الأدوات (Tools)', 'error');
+            }
+            throw new Error(errMsg);
         }
 
         if (settings.streamEnabled && res.headers.get('Content-Type')?.includes('ndjson')) {
@@ -413,25 +433,75 @@ function applyDarkMode() {
     else { document.documentElement.classList.remove('dark'); document.getElementById('dark-mode-icon').classList.replace('fa-sun', 'fa-moon'); }
 }
 
-function checkVisionSupport() {
-    const visionModels = ['gemma3', 'llava', 'moondream', 'qwen2-vl', 'bakllava'];
-    const currentModel = modelSelect.value.toLowerCase();
-    const supportsVision = visionModels.some(vm => currentModel.includes(vm));
-    imageBtn.disabled = !supportsVision;
-}
+function triggerFileUpload() { document.getElementById('file-input').click(); }
 
-function triggerImageUpload() { document.getElementById('image-input').click(); }
+let selectedFileData = null;
 
-function handleImageSelect(event) {
+async function handleFileSelect(event) {
     const file = event.target.files[0];
-    if (file) {
+    if (!file) return;
+
+    if (file.type.startsWith('image/')) {
         const reader = new FileReader();
-        reader.onload = (e) => { selectedImageBase64 = e.target.result; previewImg.src = selectedImageBase64; imagePreview.classList.remove('hidden'); };
+        reader.onload = (e) => {
+            selectedImageBase64 = e.target.result;
+            previewImg.src = selectedImageBase64;
+            imagePreview.classList.remove('hidden');
+            selectedFileData = null;
+        };
         reader.readAsDataURL(file);
+    } else {
+        // PDF or Text file
+        selectedFileData = {
+            name: file.name,
+            type: file.type,
+            content: await (file.type === 'application/pdf' ? readFileAsBase64(file) : readFileAsText(file))
+        };
+
+        // Use a generic icon or name for preview if not an image
+        previewImg.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0xNCAyekg2YTIgMiAwIDAgMC0yIDJ2MTZhMiAyIDAgMCAwIDIgMmgxMmEyIDIgMCAwIDAgMi0yVjhoLTYiLz48cG9seWxpbmUgcG9pbnRzPSIxNCAyIDE0IDggMjAgOCIvPjwvc3ZnPg=='; // File icon
+        imagePreview.classList.remove('hidden');
+        selectedImageBase64 = null;
+        showToast(`تم إرفاق الملف: ${file.name}`);
     }
 }
 
-function removeImage() { selectedImageBase64 = null; imagePreview.classList.add('hidden'); document.getElementById('image-input').value = ''; }
+function readFileAsText(file) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.readAsText(file);
+    });
+}
+
+function readFileAsBase64(file) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result.split(',')[1]);
+        reader.readAsDataURL(file);
+    });
+}
+
+function removeImage() {
+    selectedImageBase64 = null;
+    selectedFileData = null;
+    imagePreview.classList.add('hidden');
+    document.getElementById('file-input').value = '';
+}
+
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    const bgColor = type === 'error' ? 'bg-red-500' : 'bg-black dark:bg-zinc-800';
+    toast.className = `${bgColor} text-white px-6 py-3 rounded-2xl shadow-2xl text-sm font-bold animate-bounce-in flex items-center gap-2 pointer-events-auto`;
+    toast.innerHTML = `<i class="fas ${type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'}"></i> <span>${message}</span>`;
+
+    container.appendChild(toast);
+    setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2', 'transition-all', 'duration-500');
+        setTimeout(() => toast.remove(), 500);
+    }, 3000);
+}
 
 function openSettings() {
     document.getElementById('system-prompt').value = settings.systemPrompt;
@@ -492,7 +562,6 @@ function selectAgent(id) {
         if (agent) {
             if (agent.model) {
                 modelSelect.value = agent.model;
-                checkVisionSupport();
                 loadModel(agent.model);
             }
             titleEl.innerHTML = `<span class="text-lg">${agent.icon || '🤖'}</span> <span>${agent.name}</span>`;
@@ -521,12 +590,24 @@ async function fetchPlugins() {
 
 function renderPluginList(selectedPlugins = []) {
     const list = document.getElementById('plugin-list');
-    list.innerHTML = availablePlugins.map(p => `
-        <div class="flex items-center gap-3 bg-gray-50 dark:bg-zinc-900 p-3 rounded-xl border border-gray-100 dark:border-gray-800">
-            <input type="checkbox" id="plugin-${p.function.name}" value="${p.function.name}" ${selectedPlugins.includes(p.function.name) ? 'checked' : ''} class="plugin-checkbox w-4 h-4 accent-black">
-            <label for="plugin-${p.function.name}" class="text-xs truncate" title="${p.function.description}">${p.function.name}</label>
-        </div>
-    `).join('');
+    const toolNamesAR = {
+        'calculator': 'الآلة الحاسبة (Calculator)',
+        'pdf_reader': 'قارئ PDF (PDF Reader)',
+        'execute_command': 'أوامر النظام (Shell)',
+        'get_current_time': 'الوقت والتاريخ (Time)',
+        'web_request': 'طلب ويب (Web Request)'
+    };
+
+    list.innerHTML = availablePlugins.map(p => {
+        const name = p.function.name;
+        const displayName = toolNamesAR[name] || name;
+        return `
+            <div class="flex items-center gap-3 bg-gray-50 dark:bg-zinc-900 p-3 rounded-xl border border-gray-100 dark:border-gray-800">
+                <input type="checkbox" id="plugin-${name}" value="${name}" ${selectedPlugins.includes(name) ? 'checked' : ''} class="plugin-checkbox w-4 h-4 accent-black">
+                <label for="plugin-${name}" class="text-xs truncate" title="${p.function.description}">${displayName}</label>
+            </div>
+        `;
+    }).join('');
 }
 
 function openAgentStudio(agentId = null) {
@@ -635,7 +716,6 @@ async function addNewModel() {
     if (name) {
         models.push({ name, size: 0 }); renderModelSelect();
         modelSelect.value = name; document.getElementById('new-model-name').value = '';
-        checkVisionSupport();
     }
 }
 
