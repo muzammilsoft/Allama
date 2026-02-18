@@ -17,6 +17,8 @@ function readDB() {
     try {
         const data = fs.readFileSync(dbPath, 'utf8');
         const parsed = JSON.parse(data);
+        if (!parsed.sessions) parsed.sessions = [];
+        if (!parsed.messages) parsed.messages = [];
         if (!parsed.agents) parsed.agents = [];
         return parsed;
     } catch (error) {
