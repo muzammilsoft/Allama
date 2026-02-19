@@ -4,6 +4,7 @@ let models = [];
 let agents = [];
 let availablePlugins = [];
 let selectedAgentId = null;
+let currentMode = 'classic'; // 'classic' or 'agent'
 let settings = {
     systemPrompt: 'أنت مساعد ذكي ومتعاون، تدعى "علّامة". تجيب باللغة العربية بشكل افتراضي.',
     temperature: 0.7,
@@ -33,6 +34,7 @@ const tempVal = document.getElementById('temp-val');
 
 async function init() {
     loadSettings();
+    loadMode();
     applyDarkMode();
     await fetchModels();
     await fetchSessions();
@@ -133,7 +135,7 @@ async function sendMessage() {
     }
 
     const text = userInput.value.trim();
-    const activeAgent = selectedAgentId ? agents.find(a => a.id === selectedAgentId) : null;
+    const activeAgent = (currentMode === 'agent' && selectedAgentId) ? agents.find(a => a.id === selectedAgentId) : null;
 
     // Handle Uploaded File (Session-based RAG)
     if (selectedFileData) {
@@ -229,8 +231,8 @@ async function sendMessage() {
                 model: activeAgent ? activeAgent.model : modelSelect.value,
                 messages: messagesForApi,
                 options: { temperature: parseFloat(activeAgent ? activeAgent.temperature : settings.temperature) },
-                toolsEnabled: activeAgent ? (activeAgent.tools && activeAgent.tools.length > 0) : settings.toolsEnabled,
-                enabledTools: activeAgent ? activeAgent.tools : null,
+                toolsEnabled: currentMode === 'agent' ? (activeAgent ? (activeAgent.tools && activeAgent.tools.length > 0) : settings.toolsEnabled) : false,
+                enabledTools: currentMode === 'agent' ? (activeAgent ? activeAgent.tools : null) : null,
                 stream: settings.streamEnabled
             })
         });
@@ -433,6 +435,47 @@ function applyDarkMode() {
     else { document.documentElement.classList.remove('dark'); document.getElementById('dark-mode-icon').classList.replace('fa-sun', 'fa-moon'); }
 }
 
+function toggleChatMode() {
+    currentMode = currentMode === 'classic' ? 'agent' : 'classic';
+    if (currentMode === 'classic') selectedAgentId = null;
+    applyModeUI();
+    saveMode();
+    renderAgentList();
+}
+
+function applyModeUI() {
+    const btn = document.getElementById('mode-toggle-btn');
+    const icon = document.getElementById('mode-icon');
+    const text = document.getElementById('mode-text');
+    const titleEl = document.getElementById('app-title');
+
+    if (currentMode === 'agent') {
+        btn.classList.add('bg-black', 'text-white', 'dark:bg-white', 'dark:text-black');
+        btn.classList.remove('hover:bg-gray-100', 'dark:hover:bg-zinc-900');
+        icon.classList.replace('fa-user', 'fa-robot');
+        text.textContent = 'نمط الوكيل';
+        if (!selectedAgentId) {
+            titleEl.innerHTML = `OLLAMA <span class="text-blue-500 font-bold ml-1">AGENT</span>`;
+        }
+    } else {
+        btn.classList.remove('bg-black', 'text-white', 'dark:bg-white', 'dark:text-black');
+        btn.classList.add('hover:bg-gray-100', 'dark:hover:bg-zinc-900');
+        icon.classList.replace('fa-robot', 'fa-user');
+        text.textContent = 'كلاسيكي';
+        titleEl.innerHTML = `OLLAMA <span class="text-gray-400 font-light">علّامة</span>`;
+    }
+}
+
+function saveMode() {
+    localStorage.setItem('allamaMode', currentMode);
+}
+
+function loadMode() {
+    const saved = localStorage.getItem('allamaMode');
+    if (saved) currentMode = saved;
+    applyModeUI();
+}
+
 function triggerFileUpload() { document.getElementById('file-input').click(); }
 
 let selectedFileData = null;
@@ -555,9 +598,16 @@ function selectAgent(id) {
     const titleEl = document.getElementById('app-title');
     if (selectedAgentId === id) {
         selectedAgentId = null;
-        titleEl.innerHTML = `OLLAMA <span class="text-gray-400 font-light">علّامة</span>`;
+        if (currentMode === 'classic') {
+            titleEl.innerHTML = `OLLAMA <span class="text-gray-400 font-light">علّامة</span>`;
+        } else {
+            titleEl.innerHTML = `OLLAMA <span class="text-blue-500 font-bold ml-1">AGENT</span>`;
+        }
     } else {
         selectedAgentId = id;
+        currentMode = 'agent';
+        saveMode();
+        applyModeUI();
         const agent = agents.find(a => a.id === id);
         if (agent) {
             if (agent.model) {

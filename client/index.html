@@ -150,6 +150,10 @@
                     </h1>
                 </div>
                 <div class="flex items-center gap-1">
+                    <button id="mode-toggle-btn" onclick="toggleChatMode()" class="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-800 text-xs font-bold transition-all hover:bg-gray-100 dark:hover:bg-zinc-900" title="تبديل النمط (كلاسيكي / وكيل)">
+                        <i id="mode-icon" class="fas fa-user"></i>
+                        <span id="mode-text" class="hidden md:inline">كلاسيكي</span>
+                    </button>
                     <select id="model-select" class="bg-gray-50 dark:bg-zinc-900 border border-gray-300 dark:border-gray-800 text-gray-900 dark:text-gray-100 text-xs md:text-sm rounded-lg focus:ring-black focus:border-black block p-1 md:p-2 max-w-[100px] md:max-w-none">
                         <option value="">...</option>
                     </select>

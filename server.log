@@ -1,7 +1,3 @@
-
-> 3allama@1.0.0 start
-> node server/index.js
-
 Loaded plugin: calculator
 Loaded plugin: pdf_reader
 Loaded plugin: execute_command
@@ -10,4 +6,3 @@ Loaded plugin: web_request
 Server is running on http://localhost:3000
 Ollama List Models Error:
 Ollama Load Model Error:
-Terminated
