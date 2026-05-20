@@ -31,12 +31,12 @@ const SettingsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#eee' },
-  headerTitle: { fontSize: 20, fontWeight: 'bold' },
+  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#000' },
   content: { padding: 16 },
   section: { marginBottom: 24 },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 16, textAlign: 'right' },
+  sectionTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 16, textAlign: 'right', color: '#000' },
   label: { fontSize: 14, color: '#666', marginBottom: 8, textAlign: 'right' },
-  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12, fontSize: 16, textAlign: 'left' },
+  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12, fontSize: 16, textAlign: 'left', color: '#000' },
   hint: { fontSize: 12, color: '#999', marginTop: 8, textAlign: 'right' }
 });
 export default SettingsScreen;
