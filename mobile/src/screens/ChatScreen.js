@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, DrawerLayoutAndroid } from 'react-native';
-import { Menu, Send, Paperclip, Settings, Plus, User, Bot } from 'lucide-react-native';
+import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, DrawerLayoutAndroid, Modal } from 'react-native';
+import { Menu, Send, Paperclip, Settings, Plus, User, Bot, Info } from 'lucide-react-native';
 import * as db from '../database/db';
 import * as ollama from '../api/ollama';
 import Markdown from 'react-native-markdown-display';
@@ -14,6 +14,8 @@ const ChatScreen = ({ navigation }) => {
   const [sessions, setSessions] = useState([]);
   const [currentSessionId, setCurrentSessionId] = useState(null);
   const [selectedModel, setSelectedModel] = useState('');
+  const [models, setModels] = useState([]);
+  const [showModelPicker, setShowModelPicker] = useState(false);
   const drawer = useRef(null);
 
   useEffect(() => { loadSessions(); loadModels(); }, []);
@@ -29,7 +31,8 @@ const ChatScreen = ({ navigation }) => {
   const loadModels = async () => {
     try {
       const data = await ollama.listModels();
-      if (data.length > 0) setSelectedModel(data[0].name);
+      setModels(data);
+      if (data.length > 0 && !selectedModel) setSelectedModel(data[0].name);
     } catch (e) { console.log("Error loading models", e); }
   };
 
@@ -92,6 +95,9 @@ const ChatScreen = ({ navigation }) => {
           <Text style={styles.sessionText} numberOfLines={1}>{item.title}</Text>
         </TouchableOpacity>
       )} />
+      <TouchableOpacity style={styles.settingsBtn} onPress={() => { drawer.current?.closeDrawer(); navigation.navigate('About'); }}>
+        <Info size={20} color="#000" /><Text style={styles.settingsBtnText}>عن المطور</Text>
+      </TouchableOpacity>
       <TouchableOpacity style={styles.settingsBtn} onPress={() => { drawer.current?.closeDrawer(); navigation.navigate('Settings'); }}>
         <Settings size={20} color="#000" /><Text style={styles.settingsBtnText}>الإعدادات</Text>
       </TouchableOpacity>
@@ -103,9 +109,27 @@ const ChatScreen = ({ navigation }) => {
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => drawer.current?.openDrawer()}><Menu size={24} color="#000" /></TouchableOpacity>
-          <Text style={styles.headerTitle}>علّامة</Text>
+          <TouchableOpacity onPress={() => setShowModelPicker(true)}>
+            <Text style={styles.headerTitle}>{selectedModel || 'علّامة'}</Text>
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => navigation.navigate('AgentStudio')}><Bot size={24} color="#000" /></TouchableOpacity>
         </View>
+
+        <Modal visible={showModelPicker} transparent animationType="fade">
+          <TouchableOpacity style={styles.modalOverlay} onPress={() => setShowModelPicker(false)}>
+            <View style={styles.pickerModal}>
+              <Text style={styles.modalTitle}>اختر النموذج</Text>
+              <FlatList data={models} keyExtractor={item => item.name} renderItem={({ item }) => (
+                <TouchableOpacity style={[styles.modelItem, selectedModel === item.name && styles.activeModel]} onPress={() => { setSelectedModel(item.name); setShowModelPicker(false); }}>
+                  <Text style={[styles.modelText, selectedModel === item.name && styles.activeModelText]}>{item.name}</Text>
+                </TouchableOpacity>
+              )} />
+              <TouchableOpacity style={styles.closeModalBtn} onPress={() => setShowModelPicker(false)}>
+                <Text style={styles.closeModalText}>إغلاق</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
         <FlatList data={messages} keyExtractor={item => item.id} renderItem={renderMessage} contentContainerStyle={styles.messageList} />
         {loading && <View style={styles.loadingContainer}><ActivityIndicator color="#000" /><Text style={styles.loadingText}>جاري التفكير...</Text></View>}
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.inputContainer}>
@@ -123,7 +147,16 @@ const ChatScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#eee' },
-  headerTitle: { fontSize: 20, fontWeight: 'bold' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  pickerModal: { backgroundColor: '#fff', width: '80%', borderRadius: 12, padding: 20, maxHeight: '60%' },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 15, textAlign: 'center', color: '#000' },
+  modelItem: { padding: 15, borderBottomWidth: 1, borderBottomColor: '#eee' },
+  activeModel: { backgroundColor: '#f0f0f0' },
+  modelText: { fontSize: 16, textAlign: 'center', color: '#333' },
+  activeModelText: { fontWeight: 'bold', color: '#000' },
+  closeModalBtn: { marginTop: 15, padding: 10, alignItems: 'center' },
+  closeModalText: { color: '#007AFF', fontSize: 16, fontWeight: 'bold' },
+  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#000' },
   messageList: { padding: 16 },
   messageBubble: { marginBottom: 16, maxWidth: '85%', padding: 12, borderRadius: 12 },
   userBubble: { alignSelf: 'flex-start', backgroundColor: '#f0f0f0' },
@@ -138,14 +171,14 @@ const styles = StyleSheet.create({
   loadingContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 8 },
   loadingText: { marginLeft: 8, fontSize: 14, color: '#666' },
   drawerContainer: { flex: 1, backgroundColor: '#fff', padding: 16 },
-  drawerTitle: { fontSize: 24, fontWeight: 'bold', marginBottom: 20, textAlign: 'right' },
+  drawerTitle: { fontSize: 24, fontWeight: 'bold', marginBottom: 20, textAlign: 'right', color: '#000' },
   newChatBtn: { flexDirection: 'row', backgroundColor: '#000', padding: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
   newChatText: { color: '#fff', fontWeight: 'bold', marginHorizontal: 8 },
   sessionItem: { padding: 12, borderBottomWidth: 1, borderBottomColor: '#eee' },
   activeSession: { backgroundColor: '#f9f9f9' },
-  sessionText: { fontSize: 16, textAlign: 'right' },
+  sessionText: { fontSize: 16, textAlign: 'right', color: '#000' },
   settingsBtn: { flexDirection: 'row', alignItems: 'center', padding: 16, borderTopWidth: 1, borderTopColor: '#eee', marginTop: 'auto' },
-  settingsBtnText: { fontSize: 16, marginHorizontal: 12 }
+  settingsBtnText: { fontSize: 16, marginHorizontal: 12, color: '#000' }
 });
 const markdownStyles = { body: { textAlign: 'right' }, paragraph: { fontSize: 16, color: '#333' } };
 export default ChatScreen;

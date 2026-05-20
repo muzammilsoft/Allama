@@ -47,17 +47,17 @@ const AgentStudioScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#eee' },
-  headerTitle: { fontSize: 20, fontWeight: 'bold' },
+  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#000' },
   content: { padding: 16 },
   form: { marginBottom: 32, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: '#eee' },
   label: { fontSize: 14, color: '#666', marginBottom: 8, textAlign: 'right' },
-  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12, fontSize: 16, marginBottom: 16, textAlign: 'right' },
+  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12, fontSize: 16, marginBottom: 16, textAlign: 'right', color: '#000' },
   createBtn: { flexDirection: 'row', backgroundColor: '#000', padding: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   createBtnText: { color: '#fff', fontWeight: 'bold', marginHorizontal: 8 },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 16, textAlign: 'right' },
+  sectionTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 16, textAlign: 'right', color: '#000' },
   agentCard: { flexDirection: 'row', alignItems: 'center', padding: 16, borderWidth: 1, borderColor: '#eee', borderRadius: 12, marginBottom: 12 },
   agentInfo: { flex: 1, marginHorizontal: 16 },
-  agentName: { fontSize: 16, fontWeight: 'bold', textAlign: 'right' },
+  agentName: { fontSize: 16, fontWeight: 'bold', textAlign: 'right', color: '#000' },
   agentPrompt: { fontSize: 12, color: '#666', textAlign: 'right' }
 });
 export default AgentStudioScreen;
