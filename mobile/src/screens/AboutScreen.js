@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Linking, ScrollView } from 'react-native';
-import { ChevronLeft, Github, Facebook, Mail, Globe } from 'lucide-react-native';
+import { ChevronLeft, Github, Facebook, Mail } from 'lucide-react-native';
 
 const AboutScreen = ({ navigation }) => {
   return (
