@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, DrawerLayoutAndroid, Modal } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, DrawerLayoutAndroid, Modal, ToastAndroid } from 'react-native';
 import { Menu, Send, Paperclip, Settings, Plus, User, Bot, Info } from 'lucide-react-native';
 import * as db from '../database/db';
 import * as ollama from '../api/ollama';
@@ -32,8 +32,16 @@ const ChatScreen = ({ navigation }) => {
     try {
       const data = await ollama.listModels();
       setModels(data);
-      if (data.length > 0 && !selectedModel) setSelectedModel(data[0].name);
-    } catch (e) { console.log("Error loading models", e); }
+      if (data.length > 0) {
+        if (!selectedModel) setSelectedModel(data[0].name);
+        ToastAndroid.show('تم الاتصال بـ Ollama بنجاح', ToastAndroid.SHORT);
+      } else {
+        ToastAndroid.show('متصل، ولكن لا توجد نماذج متاحة', ToastAndroid.SHORT);
+      }
+    } catch (e) {
+      console.log("Error loading models", e);
+      ToastAndroid.show('فشل الاتصال بـ Ollama. تأكد من تشغيل الخادم', ToastAndroid.LONG);
+    }
   };
 
   const createNewSession = async () => {
@@ -84,7 +92,7 @@ const ChatScreen = ({ navigation }) => {
     </View>
   );
 
-  const navigationView = (
+  const navigationView = () => (
     <View style={styles.drawerContainer}>
       <Text style={styles.drawerTitle}>المحادثات</Text>
       <TouchableOpacity style={styles.newChatBtn} onPress={createNewSession}>
@@ -105,7 +113,7 @@ const ChatScreen = ({ navigation }) => {
   );
 
   return (
-    <DrawerLayoutAndroid ref={drawer} drawerWidth={300} drawerPosition="right" renderNavigationView={() => navigationView}>
+    <DrawerLayoutAndroid ref={drawer} drawerWidth={300} drawerPosition="right" renderNavigationView={navigationView}>
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => drawer.current?.openDrawer()}><Menu size={24} color="#000" /></TouchableOpacity>
@@ -164,7 +172,7 @@ const styles = StyleSheet.create({
   messageHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   roleText: { fontSize: 12, color: '#666', marginHorizontal: 4 },
   inputContainer: { flexDirection: 'row', alignItems: 'center', padding: 8, borderTopWidth: 1, borderTopColor: '#eee' },
-  input: { flex: 1, paddingHorizontal: 12, paddingVertical: 8, fontSize: 16, textAlign: 'right' },
+  input: { flex: 1, paddingHorizontal: 12, paddingVertical: 8, fontSize: 16, textAlign: 'right', color: '#000' },
   iconBtn: { padding: 8 },
   sendBtn: { backgroundColor: '#000', padding: 10, borderRadius: 20 },
   sendBtnDisabled: { backgroundColor: '#ccc' },
