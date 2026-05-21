@@ -1,0 +1,38 @@
+[
+  {
+    "id": "danube-0.5b",
+    "name": "H2O Danube3 0.5B (صغير جداً)",
+    "description": "مناسب للأجهزة الضعيفة، سريع جداً.",
+    "size": "340MB",
+    "ramRequired": 512,
+    "url": "https://huggingface.co/bartowski/h2o-danube3-0.5b-chat-GGUF/resolve/main/h2o-danube3-0.5b-chat-Q4_K_M.gguf",
+    "filename": "h2o-danube3-0.5b-chat-Q4_K_M.gguf"
+  },
+  {
+    "id": "qwen-1.5b",
+    "name": "Qwen2.5 1.5B (متوازن)",
+    "description": "أداء جيد بحجم صغير، يدعم العربية بشكل ممتاز.",
+    "size": "1.1GB",
+    "ramRequired": 1500,
+    "url": "https://huggingface.co/bartowski/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/Qwen2.5-1.5B-Instruct-Q4_K_M.gguf",
+    "filename": "Qwen2.5-1.5B-Instruct-Q4_K_M.gguf"
+  },
+  {
+    "id": "llama-3.2-1b",
+    "name": "Llama 3.2 1B (رسمي من Meta)",
+    "description": "نموذج خفيف وذكي جداً من ميتا.",
+    "size": "700MB",
+    "ramRequired": 1024,
+    "url": "https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_K_M.gguf",
+    "filename": "Llama-3.2-1B-Instruct-Q4_K_M.gguf"
+  },
+  {
+    "id": "llama-3.2-3b",
+    "name": "Llama 3.2 3B (قوي)",
+    "description": "أفضل أداء للأجهزة المتوسطة والقوية.",
+    "size": "2.0GB",
+    "ramRequired": 3072,
+    "url": "https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf",
+    "filename": "Llama-3.2-3B-Instruct-Q4_K_M.gguf"
+  }
+]

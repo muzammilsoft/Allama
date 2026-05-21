@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, DrawerLayoutAndroid, Modal, ToastAndroid } from 'react-native';
-import { Menu, Send, Paperclip, Settings, Plus, User, Bot, Info } from 'lucide-react-native';
+import { Menu, Send, Paperclip, Settings, Plus, User, Bot, Info, Cpu } from 'lucide-react-native';
 import * as db from '../database/db';
 import * as ollama from '../api/ollama';
 import Markdown from 'react-native-markdown-display';
@@ -103,6 +103,9 @@ const ChatScreen = ({ navigation }) => {
           <Text style={styles.sessionText} numberOfLines={1}>{item.title}</Text>
         </TouchableOpacity>
       )} />
+      <TouchableOpacity style={styles.settingsBtn} onPress={() => { drawer.current?.closeDrawer(); setTimeout(() => navigation.navigate('ModelManager'), 100); }}>
+        <Cpu size={20} color="#000" /><Text style={styles.settingsBtnText}>الذكاء الاصطناعي المحلي (Off-line)</Text>
+      </TouchableOpacity>
       <TouchableOpacity style={styles.settingsBtn} onPress={() => { drawer.current?.closeDrawer(); setTimeout(() => navigation.navigate('About'), 100); }}>
         <Info size={20} color="#000" /><Text style={styles.settingsBtnText}>عن المطور</Text>
       </TouchableOpacity>

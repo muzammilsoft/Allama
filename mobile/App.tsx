@@ -6,6 +6,8 @@ import ChatScreen from './src/screens/ChatScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import AgentStudioScreen from './src/screens/AgentStudioScreen';
 import AboutScreen from './src/screens/AboutScreen';
+import ModelManagerScreen from './src/screens/ModelManagerScreen';
+import LocalChatScreen from './src/screens/LocalChatScreen';
 import { initDatabase } from './src/database/db';
 const Stack = createStackNavigator();
 I18nManager.forceRTL(true); I18nManager.allowRTL(true);
@@ -18,6 +20,8 @@ const App = () => {
         <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="AgentStudio" component={AgentStudioScreen} />
         <Stack.Screen name="About" component={AboutScreen} />
+        <Stack.Screen name="ModelManager" component={ModelManagerScreen} />
+        <Stack.Screen name="LocalChat" component={LocalChatScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
