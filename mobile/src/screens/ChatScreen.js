@@ -103,7 +103,7 @@ const ChatScreen = ({ navigation }) => {
           <Text style={styles.sessionText} numberOfLines={1}>{item.title}</Text>
         </TouchableOpacity>
       )} />
-      <TouchableOpacity style={styles.settingsBtn} onPress={() => { drawer.current?.closeDrawer(); navigation.navigate('About'); }}>
+      <TouchableOpacity style={styles.settingsBtn} onPress={() => { drawer.current?.closeDrawer(); setTimeout(() => navigation.navigate('About'), 100); }}>
         <Info size={20} color="#000" /><Text style={styles.settingsBtnText}>عن المطور</Text>
       </TouchableOpacity>
       <TouchableOpacity style={styles.settingsBtn} onPress={() => { drawer.current?.closeDrawer(); navigation.navigate('Settings'); }}>
@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
   activeModelText: { fontWeight: 'bold', color: '#000' },
   closeModalBtn: { marginTop: 15, padding: 10, alignItems: 'center' },
   closeModalText: { color: '#007AFF', fontSize: 16, fontWeight: 'bold' },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#000' },
+  headerTitle: { fontSize: 22, fontWeight: 'bold', color: '#000', letterSpacing: -0.5 },
   messageList: { padding: 16 },
   messageBubble: { marginBottom: 16, maxWidth: '85%', padding: 12, borderRadius: 12 },
   userBubble: { alignSelf: 'flex-start', backgroundColor: '#f0f0f0' },
@@ -188,5 +188,10 @@ const styles = StyleSheet.create({
   settingsBtn: { flexDirection: 'row', alignItems: 'center', padding: 16, borderTopWidth: 1, borderTopColor: '#eee', marginTop: 'auto' },
   settingsBtnText: { fontSize: 16, marginHorizontal: 12, color: '#000' }
 });
-const markdownStyles = { body: { textAlign: 'right' }, paragraph: { fontSize: 16, color: '#333' } };
+const markdownStyles = {
+  body: { textAlign: 'right', color: '#333' },
+  paragraph: { fontSize: 16, lineHeight: 24 },
+  code_inline: { backgroundColor: '#f0f0f0', borderRadius: 4, padding: 2, fontFamily: 'monospace' },
+  code_block: { backgroundColor: '#f5f5f5', borderRadius: 8, padding: 12, marginVertical: 10, fontFamily: 'monospace' }
+};
 export default ChatScreen;
