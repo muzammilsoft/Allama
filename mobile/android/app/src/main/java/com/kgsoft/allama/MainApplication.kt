@@ -1,4 +1,4 @@
-package com.allamaapp
+package com.kgsoft.allama
 
 import android.app.Application
 import com.facebook.react.PackageList
