@@ -41,11 +41,12 @@ const LocalChatScreen = ({ route, navigation }: any) => {
       setLoading(true);
       const modelPath = ModelService.getModelPath(modelFile);
 
+      // llama.rn 0.12.x syntax (New Architecture)
       contextRef.current = await initLlama({
         model: modelPath,
         use_mlock: true,
         n_ctx: 2048,
-        n_gpu_layers: -1, // محاولة استخدام الـ GPU بالكامل (Vulkan/Metal)
+        n_gpu_layers: -1, // -1 means auto detection (Vulkan/Metal)
       });
 
       setIsLlamaReady(true);
