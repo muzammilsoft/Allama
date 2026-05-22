@@ -36,10 +36,17 @@ jobs:
       - name: Make Gradlew executable
         run: chmod +x mobile/android/gradlew
 
+      - name: Clean Gradle cache
+        run: |
+          cd mobile/android
+          ./gradlew clean
+
       - name: Build Android Release APK
         run: |
           cd mobile/android
-          ./gradlew assembleRelease --stacktrace
+          ./gradlew assembleRelease --stacktrace -Dorg.gradle.jvmargs="-Xmx4096m"
+        env:
+          ORG_GRADLE_PROJECT_newArchEnabled: true
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
