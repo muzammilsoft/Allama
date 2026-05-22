@@ -36,10 +36,17 @@ jobs:
       - name: Make Gradlew executable
         run: chmod +x mobile/android/gradlew
 
-      - name: Clean Gradle cache
+      - name: Clean Gradle cache and node_modules
         run: |
-          cd mobile/android
+          cd mobile
+          rm -rf node_modules
+          cd android
           ./gradlew clean
+
+      - name: Reinstall dependencies
+        run: |
+          cd mobile
+          npm install --legacy-peer-deps
 
       - name: Build Android Release APK
         run: |
