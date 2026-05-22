@@ -28,6 +28,11 @@ jobs:
           cache: 'npm'
           cache-dependency-path: mobile/package-lock.json
 
+      - name: Clean previous builds
+        run: |
+          cd mobile
+          rm -rf node_modules package-lock.json
+
       - name: Install dependencies
         run: |
           cd mobile
@@ -36,11 +41,17 @@ jobs:
       - name: Make Gradlew executable
         run: chmod +x mobile/android/gradlew
 
-      - name: Build Android Release APK
+      - name: Clean Gradle cache
         run: |
           cd mobile/android
           ./gradlew clean
-          ./gradlew assembleRelease --stacktrace
+
+      - name: Build Android Release APK
+        run: |
+          cd mobile/android
+          ./gradlew assembleRelease --stacktrace -Dorg.gradle.jvmargs="-Xmx4096m"
+        env:
+          ORG_GRADLE_PROJECT_newArchEnabled: false
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
