@@ -1,30 +1,30 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, Alert, AppState } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, Alert, AppState, StatusBar } from 'react-native';
 import { ChevronLeft, Send, User, Bot, Trash2 } from 'lucide-react-native';
 import { initLlama, LlamaContext } from 'llama.rn';
 import { ModelService } from '../services/ModelService';
 import Markdown from 'react-native-markdown-display';
 import { generateId } from '../utils/utils';
+import { useTheme } from '../utils/ThemeContext';
 
 const LocalChatScreen = ({ route, navigation }: any) => {
+  const { colors, isDark } = useTheme();
   const { modelFile } = route.params;
   const [messages, setMessages] = useState<any[]>([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
   const [isLlamaReady, setIsLlamaReady] = useState(false);
+  const [speed, setSpeed] = useState<number | null>(null);
   const contextRef = useRef<LlamaContext | null>(null);
   const appState = useRef(AppState.currentState);
 
   useEffect(() => {
     setupLlama();
 
-    // مراقبة حالة التطبيق لإيقاف الـ context في الخلفية
     const subscription = AppState.addEventListener('change', nextAppState => {
       if (appState.current === 'active' && nextAppState.match(/inactive|background/)) {
-        console.log('App in background, releasing llama context');
         releaseContext();
       } else if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
-        console.log('App back to active, re-initializing llama');
         setupLlama();
       }
       appState.current = nextAppState;
@@ -41,19 +41,21 @@ const LocalChatScreen = ({ route, navigation }: any) => {
       setLoading(true);
       const modelPath = ModelService.getModelPath(modelFile);
 
-      // llama.rn 0.9.3 syntax (Old Architecture)
+      await ModelService.init();
+
       contextRef.current = await initLlama({
         model: modelPath,
         use_mlock: true,
-        n_ctx: 2048,
-        n_gpu_layers: 99, // 99 means use GPU as much as possible in 0.9.x
+        n_ctx: 1024,
+        n_gpu_layers: 99, // Enable Vulkan/GPU acceleration
+        n_threads: 4,
       });
 
       setIsLlamaReady(true);
       setLoading(false);
-    } catch (error) {
-      console.error(error);
-      Alert.alert('خطأ', 'فشل تحميل النموذج. قد يكون جهازك غير قادر على تشغيله.');
+    } catch (error: any) {
+      console.error("Llama Init Error:", error);
+      Alert.alert('خطأ في تحميل المحرك', `فشل تحميل النموذج: ${error.message || 'خطأ غير معروف'}`);
       navigation.goBack();
     }
   };
@@ -73,25 +75,37 @@ const LocalChatScreen = ({ route, navigation }: any) => {
     setMessages(prev => [...prev, userMsg]);
     setInputText('');
     setLoading(true);
+    setSpeed(null);
 
     try {
       let assistantMsgContent = '';
       const assistantId = generateId();
+      let tokenCount = 0;
+      const startTime = Date.now();
 
-      // إضافة فقاعة فارغة للرد قبل البدء
       setMessages(prev => [...prev, { id: assistantId, role: 'assistant', content: '' }]);
+
+      const prompt = messages.slice(-4).map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`).join('\n') + `\nUser: ${inputText}\nAssistant:`;
 
       await contextRef.current?.completion(
         {
-          prompt: `User: ${inputText}\nAssistant:`,
+          prompt: prompt,
           n_predict: 512,
-          stop: ['User:', '\nAssistant:'],
+          temperature: 0.7,
+          top_p: 0.9,
+          stop: ['User:', '\nAssistant:', '</s>'],
         },
         (data) => {
+          tokenCount++;
           assistantMsgContent += data.token;
           setMessages(prev => prev.map(m =>
             m.id === assistantId ? { ...m, content: assistantMsgContent } : m
           ));
+
+          if (tokenCount % 5 === 0) {
+            const elapsed = (Date.now() - startTime) / 1000;
+            setSpeed(parseFloat((tokenCount / elapsed).toFixed(2)));
+          }
         }
       );
     } catch (error) {
@@ -106,27 +120,33 @@ const LocalChatScreen = ({ route, navigation }: any) => {
   };
 
   const renderMessage = ({ item }: { item: any }) => (
-    <View style={[styles.messageBubble, item.role === 'user' ? styles.userBubble : styles.assistantBubble]}>
+    <View style={[
+      styles.messageBubble,
+      item.role === 'user' ?
+        {...styles.userBubble, backgroundColor: colors.bubbleUser} :
+        {...styles.assistantBubble, backgroundColor: colors.bubbleAssistant, borderColor: colors.border}
+    ]}>
       <View style={styles.messageHeader}>
-        {item.role === 'user' ? <User size={16} color="#666" /> : <Bot size={16} color="#000" />}
-        <Text style={styles.roleText}>{item.role === 'user' ? 'أنت' : 'علّامة (محلي)'}</Text>
+        {item.role === 'user' ? <User size={16} color={colors.textSecondary} /> : <Bot size={16} color={colors.primary} />}
+        <Text style={[styles.roleText, {color: colors.textSecondary}]}>{item.role === 'user' ? 'أنت' : 'علّامة (محلي)'}</Text>
       </View>
-      <Markdown style={markdownStyles}>{item.content}</Markdown>
+      <Markdown style={getMarkdownStyles(colors)}>{item.content}</Markdown>
     </View>
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
+      <View style={[styles.header, {borderBottomColor: colors.border}]}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <ChevronLeft size={24} color="#000" />
+          <ChevronLeft size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>الدردشة المحلية</Text>
-          <Text style={styles.headerSub}>{modelFile}</Text>
+          <Text style={[styles.headerTitle, {color: colors.text}]}>الدردشة المحلية</Text>
+          <Text style={[styles.headerSub, {color: colors.textSecondary}]}>{modelFile}</Text>
         </View>
         <TouchableOpacity onPress={clearChat}>
-          <Trash2 size={24} color="#666" />
+          <Trash2 size={24} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
 
@@ -138,28 +158,35 @@ const LocalChatScreen = ({ route, navigation }: any) => {
         ref={(ref) => ref?.scrollToEnd()}
       />
 
-      {loading && !isLlamaReady && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#000" />
-          <Text style={styles.loadingText}>جاري تحميل النموذج في الذاكرة...</Text>
+      {speed && (
+        <View style={styles.speedIndicator}>
+          <Text style={[styles.speedText, {color: colors.textSecondary}]}>السرعة: {speed} t/s</Text>
         </View>
       )}
 
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.inputContainer}>
+      {loading && !isLlamaReady && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, {color: colors.text}]}>جاري تحميل النموذج في الذاكرة...</Text>
+        </View>
+      )}
+
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={[styles.inputContainer, {borderTopColor: colors.border}]}>
         <TextInput
-          style={styles.input}
+          style={[styles.input, {color: colors.text}]}
           value={inputText}
           onChangeText={setInputText}
           placeholder="اكتب رسالتك هنا..."
+          placeholderTextColor={colors.textSecondary}
           multiline
           editable={isLlamaReady && !loading}
         />
         <TouchableOpacity
-          style={[styles.sendBtn, (!inputText.trim() || !isLlamaReady || loading) && styles.sendBtnDisabled]}
+          style={[styles.sendBtn, {backgroundColor: colors.primary}, (!inputText.trim() || !isLlamaReady || loading) && {backgroundColor: colors.border}]}
           onPress={sendMessage}
           disabled={!inputText.trim() || !isLlamaReady || loading}
         >
-          <Send size={20} color="#fff" />
+          <Send size={20} color={colors.primaryContrast} />
         </TouchableOpacity>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -167,30 +194,31 @@ const LocalChatScreen = ({ route, navigation }: any) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#eee' },
+  container: { flex: 1 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1 },
   headerTitleContainer: { alignItems: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#000' },
-  headerSub: { fontSize: 10, color: '#666' },
+  headerTitle: { fontSize: 18, fontFamily: 'Cairo-Bold' },
+  headerSub: { fontSize: 10, fontFamily: 'Cairo-Regular' },
   messageList: { padding: 16 },
   messageBubble: { marginBottom: 16, maxWidth: '85%', padding: 12, borderRadius: 12 },
-  userBubble: { alignSelf: 'flex-start', backgroundColor: '#f0f0f0' },
-  assistantBubble: { alignSelf: 'flex-end', backgroundColor: '#fff', borderWidth: 1, borderColor: '#eee' },
+  userBubble: { alignSelf: 'flex-start' },
+  assistantBubble: { alignSelf: 'flex-end', borderWidth: 1 },
   messageHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-  roleText: { fontSize: 12, color: '#666', marginHorizontal: 4 },
-  inputContainer: { flexDirection: 'row', alignItems: 'center', padding: 8, borderTopWidth: 1, borderTopColor: '#eee' },
-  input: { flex: 1, paddingHorizontal: 12, paddingVertical: 8, fontSize: 16, textAlign: 'right', color: '#000' },
-  sendBtn: { backgroundColor: '#000', padding: 10, borderRadius: 20 },
-  sendBtnDisabled: { backgroundColor: '#ccc' },
+  roleText: { fontSize: 12, marginHorizontal: 4, fontFamily: 'Cairo-Medium' },
+  inputContainer: { flexDirection: 'row', alignItems: 'center', padding: 8, borderTopWidth: 1 },
+  input: { flex: 1, paddingHorizontal: 12, paddingVertical: 8, fontSize: 16, textAlign: 'right', fontFamily: 'Cairo-Regular' },
+  sendBtn: { padding: 10, borderRadius: 20 },
   loadingOverlay: { position: 'absolute', top: 100, left: 0, right: 0, alignItems: 'center', zIndex: 10 },
-  loadingText: { marginTop: 12, fontSize: 14, color: '#000', fontWeight: 'bold' }
+  loadingText: { marginTop: 12, fontSize: 14, fontFamily: 'Cairo-Bold' },
+  speedIndicator: { padding: 4, alignItems: 'center' },
+  speedText: { fontSize: 10, fontFamily: 'Cairo-Regular' }
 });
 
-const markdownStyles = {
-  body: { textAlign: 'right', color: '#333' },
-  paragraph: { fontSize: 16, lineHeight: 24 },
-  code_inline: { backgroundColor: '#f0f0f0', borderRadius: 4, padding: 2, fontFamily: 'monospace' },
-  code_block: { backgroundColor: '#f5f5f5', borderRadius: 8, padding: 12, marginVertical: 10, fontFamily: 'monospace' }
-};
+const getMarkdownStyles = (colors) => ({
+  body: { textAlign: 'right', color: colors.text, fontFamily: 'Cairo-Regular' },
+  paragraph: { fontSize: 16, lineHeight: 24, fontFamily: 'Cairo-Regular' },
+  code_inline: { backgroundColor: colors.surface, borderRadius: 4, padding: 2, fontFamily: 'monospace', color: colors.text },
+  code_block: { backgroundColor: colors.surface, borderRadius: 8, padding: 12, marginVertical: 10, fontFamily: 'monospace', color: colors.text }
+});
 
 export default LocalChatScreen;

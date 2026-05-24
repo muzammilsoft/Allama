@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, Alert, StatusBar } from 'react-native';
 import ProgressBar from '@react-native-community/progress-bar-android';
 import { ChevronLeft, Download, Trash2, CheckCircle, MessageCircle } from 'lucide-react-native';
 import { ModelService, Model } from '../services/ModelService';
 import RNFS from 'react-native-fs';
+import { useTheme } from '../utils/ThemeContext';
 
 const ModelManagerScreen = ({ navigation }: any) => {
+  const { colors, isDark } = useTheme();
   const [models, setModels] = useState<any[]>([]);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
@@ -32,9 +34,15 @@ const ModelManagerScreen = ({ navigation }: any) => {
     setProgress(0);
 
     try {
-      const { jobId, promise } = await ModelService.downloadModel(model, (p) => {
+      const downloadResult = await ModelService.downloadModel(model, (p) => {
         setProgress(p);
       });
+
+      if (!downloadResult) {
+        throw new Error("Failed to start download job");
+      }
+
+      const { jobId, promise } = downloadResult;
       setCurrentJobId(jobId);
 
       const result = await promise;
@@ -42,10 +50,11 @@ const ModelManagerScreen = ({ navigation }: any) => {
         Alert.alert('نجاح', 'تم تحميل النموذج بنجاح.');
         loadModels();
       } else {
-        Alert.alert('خطأ', 'فشل تحميل النموذج. حاول مرة أخرى.');
+        Alert.alert('خطأ', `فشل تحميل النموذج (كود: ${result.statusCode}). حاول مرة أخرى.`);
       }
-    } catch (error) {
-      Alert.alert('خطأ', 'حدث خطأ غير متوقع أثناء التحميل.');
+    } catch (error: any) {
+      console.error("Download Error:", error);
+      Alert.alert('خطأ', `حدث خطأ أثناء التحميل: ${error.message || 'خطأ غير معروف'}`);
     } finally {
       setDownloadingId(null);
       setCurrentJobId(null);
@@ -71,12 +80,12 @@ const ModelManagerScreen = ({ navigation }: any) => {
   };
 
   const renderItem = ({ item }: { item: any }) => (
-    <View style={[styles.modelCard, !item.isCompatible && styles.incompatibleCard]}>
+    <View style={[styles.modelCard, {backgroundColor: colors.surface, borderColor: colors.border}, !item.isCompatible && styles.incompatibleCard]}>
       <View style={styles.modelHeader}>
-        <Text style={styles.modelName}>{item.name}</Text>
-        <Text style={styles.modelSize}>{item.size}</Text>
+        <Text style={[styles.modelName, {color: colors.text}]}>{item.name}</Text>
+        <Text style={[styles.modelSize, {color: colors.textSecondary}]}>{item.size}</Text>
       </View>
-      <Text style={styles.modelDesc}>{item.description}</Text>
+      <Text style={[styles.modelDesc, {color: colors.textSecondary}]}>{item.description}</Text>
 
       {!item.isCompatible ? (
         <Text style={styles.warningText}>جهازك قد لا يشغل هذا النموذج بسلاسة (يحتاج رام أكثر).</Text>
@@ -93,7 +102,7 @@ const ModelManagerScreen = ({ navigation }: any) => {
               style={styles.chatLinkBtn}
               onPress={() => navigation.navigate('LocalChat', { modelFile: item.filename })}
             >
-              <MessageCircle size={20} color="#000" />
+              <MessageCircle size={20} color={colors.text} />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => handleDelete(item)}>
               <Trash2 size={20} color="red" />
@@ -102,8 +111,15 @@ const ModelManagerScreen = ({ navigation }: any) => {
         ) : (
           downloadingId === item.id ? (
             <View style={styles.progressContainer}>
-              <Text style={styles.progressText}>{Math.round(progress)}%</Text>
-              <ProgressBar styleAttr="Horizontal" indeterminate={false} progress={progress / 100} color="#000" />
+              <Text style={[styles.progressText, {color: colors.text}]}>
+                {progress === -1 ? 'جاري التحميل...' : `${Math.round(progress)}%`}
+              </Text>
+              <ProgressBar
+                styleAttr="Horizontal"
+                indeterminate={progress === -1}
+                progress={progress === -1 ? 0 : progress / 100}
+                color={colors.primary}
+              />
               <TouchableOpacity onPress={() => {
                 if (currentJobId) RNFS.stopDownload(currentJobId);
               }}>
@@ -112,12 +128,12 @@ const ModelManagerScreen = ({ navigation }: any) => {
             </View>
           ) : (
             <TouchableOpacity
-              style={[styles.downloadBtn, !item.isCompatible && styles.disabledBtn]}
+              style={[styles.downloadBtn, {backgroundColor: colors.primary}, !item.isCompatible && styles.disabledBtn]}
               onPress={() => handleDownload(item)}
               disabled={!item.isCompatible}
             >
-              <Download size={18} color="#fff" />
-              <Text style={styles.downloadBtnText}>تحميل</Text>
+              <Download size={18} color={colors.primaryContrast} />
+              <Text style={[styles.downloadBtnText, {color: colors.primaryContrast}]}>تحميل</Text>
             </TouchableOpacity>
           )
         )}
@@ -126,17 +142,18 @@ const ModelManagerScreen = ({ navigation }: any) => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
+      <View style={[styles.header, {borderBottomColor: colors.border}]}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <ChevronLeft size={24} color="#000" />
+          <ChevronLeft size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>إدارة النماذج المحلية</Text>
+        <Text style={[styles.headerTitle, {color: colors.text}]}>إدارة النماذج المحلية</Text>
         <View style={{ width: 24 }} />
       </View>
 
-      <View style={styles.infoBox}>
-        <Text style={styles.infoText}>هذه النماذج تعمل محلياً تماماً على معالج جهازك بدون إنترنت.</Text>
+      <View style={[styles.infoBox, {backgroundColor: isDark ? '#1a2a3a' : '#f0f7ff'}]}>
+        <Text style={[styles.infoText, {color: isDark ? '#80b3ff' : '#0056b3'}]}>هذه النماذج تعمل محلياً تماماً على معالج جهازك بدون إنترنت.</Text>
       </View>
 
       <FlatList
@@ -150,29 +167,29 @@ const ModelManagerScreen = ({ navigation }: any) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#eee' },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#000' },
+  container: { flex: 1 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1 },
+  headerTitle: { fontSize: 20, fontFamily: 'Cairo-Bold' },
   list: { padding: 16 },
-  modelCard: { padding: 16, borderWidth: 1, borderColor: '#eee', borderRadius: 12, marginBottom: 16, backgroundColor: '#fafafa' },
+  modelCard: { padding: 16, borderWidth: 1, borderRadius: 12, marginBottom: 16 },
   incompatibleCard: { opacity: 0.7 },
   modelHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  modelName: { fontSize: 16, fontWeight: 'bold', color: '#000', flex: 1, textAlign: 'right' },
-  modelSize: { fontSize: 14, color: '#666', marginLeft: 8 },
-  modelDesc: { fontSize: 14, color: '#444', textAlign: 'right', marginBottom: 12 },
+  modelName: { fontSize: 16, flex: 1, textAlign: 'right', fontFamily: 'Cairo-Bold' },
+  modelSize: { fontSize: 14, marginLeft: 8, fontFamily: 'Cairo-Regular' },
+  modelDesc: { fontSize: 14, textAlign: 'right', marginBottom: 12, fontFamily: 'Cairo-Regular' },
   actions: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginTop: 8 },
-  downloadBtn: { flexDirection: 'row', backgroundColor: '#000', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, alignItems: 'center' },
-  downloadBtnText: { color: '#fff', fontWeight: 'bold', marginLeft: 8 },
+  downloadBtn: { flexDirection: 'row', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, alignItems: 'center' },
+  downloadBtnText: { marginLeft: 8, fontFamily: 'Cairo-Bold' },
   disabledBtn: { backgroundColor: '#ccc' },
   statusBadge: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  statusText: { fontSize: 14, color: 'green', marginLeft: 6, fontWeight: 'bold' },
+  statusText: { fontSize: 14, color: 'green', marginLeft: 6, fontFamily: 'Cairo-Bold' },
   chatLinkBtn: { marginHorizontal: 12 },
-  warningText: { fontSize: 12, color: 'orange', textAlign: 'right', marginBottom: 8 },
-  infoBox: { padding: 16, backgroundColor: '#f0f7ff', margin: 16, borderRadius: 8 },
-  infoText: { fontSize: 13, color: '#0056b3', textAlign: 'center' },
+  warningText: { fontSize: 12, color: 'orange', textAlign: 'right', marginBottom: 8, fontFamily: 'Cairo-Regular' },
+  infoBox: { padding: 16, margin: 16, borderRadius: 8 },
+  infoText: { fontSize: 13, textAlign: 'center', fontFamily: 'Cairo-Medium' },
   progressContainer: { flex: 1, marginLeft: 16 },
-  progressText: { textAlign: 'center', fontSize: 12, color: '#000' },
-  cancelText: { color: 'red', textAlign: 'center', marginTop: 4, fontSize: 12 }
+  progressText: { textAlign: 'center', fontSize: 12, fontFamily: 'Cairo-Regular' },
+  cancelText: { color: 'red', textAlign: 'center', marginTop: 4, fontSize: 12, fontFamily: 'Cairo-Bold' }
 });
 
 export default ModelManagerScreen;

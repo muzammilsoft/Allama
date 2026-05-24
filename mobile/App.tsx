@@ -9,21 +9,27 @@ import AboutScreen from './src/screens/AboutScreen';
 import ModelManagerScreen from './src/screens/ModelManagerScreen';
 import LocalChatScreen from './src/screens/LocalChatScreen';
 import { initDatabase } from './src/database/db';
+import ErrorBoundary from './src/utils/ErrorBoundary';
+import { ThemeProvider } from './src/utils/ThemeContext';
 const Stack = createStackNavigator();
 I18nManager.forceRTL(true); I18nManager.allowRTL(true);
 const App = () => {
   useEffect(() => { initDatabase().catch(err => console.error("DB Init Error:", err)); }, []);
   return (
-    <NavigationContainer>
-      <Stack.Navigator initialRouteName="Chat" screenOptions={{ headerShown: false, cardStyle: { backgroundColor: '#ffffff' } }}>
-        <Stack.Screen name="Chat" component={ChatScreen} />
-        <Stack.Screen name="Settings" component={SettingsScreen} />
-        <Stack.Screen name="AgentStudio" component={AgentStudioScreen} />
-        <Stack.Screen name="About" component={AboutScreen} />
-        <Stack.Screen name="ModelManager" component={ModelManagerScreen} />
-        <Stack.Screen name="LocalChat" component={LocalChatScreen} />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <ThemeProvider>
+      <ErrorBoundary>
+        <NavigationContainer>
+          <Stack.Navigator initialRouteName="Chat" screenOptions={{ headerShown: false, cardStyle: { backgroundColor: 'transparent' } }}>
+            <Stack.Screen name="Chat" component={ChatScreen} />
+            <Stack.Screen name="Settings" component={SettingsScreen} />
+            <Stack.Screen name="AgentStudio" component={AgentStudioScreen} />
+            <Stack.Screen name="About" component={AboutScreen} />
+            <Stack.Screen name="ModelManager" component={ModelManagerScreen} />
+            <Stack.Screen name="LocalChat" component={LocalChatScreen} />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </ErrorBoundary>
+    </ThemeProvider>
   );
 };
 export default App;

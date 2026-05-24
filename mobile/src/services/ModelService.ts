@@ -53,21 +53,36 @@ export const ModelService = {
   downloadModel: async (model: Model, onProgress: (progress: number) => void) => {
     const path = `${MODELS_DIR}/${model.filename}`;
 
+    // التأكد من وجود المجلد قبل التحميل
+    await ModelService.init();
+
     const options: RNFS.DownloadFileOptions = {
       fromUrl: model.url,
       toFile: path,
+      background: true,
+      discretionary: true,
       progress: (res) => {
-        const percent = (res.bytesWritten / res.contentLength) * 100;
-        onProgress(percent);
+        if (res.contentLength > 0) {
+          const percent = (res.bytesWritten / res.contentLength) * 100;
+          onProgress(percent);
+        } else {
+          // إذا لم يتوفر حجم الملف، نحسبه بناءً على ما تم كتابته (تقديري)
+          onProgress(-1);
+        }
       },
       progressDivider: 1
     };
 
-    const result = RNFS.downloadFile(options);
-    return {
-      jobId: result.jobId,
-      promise: result.promise
-    };
+    try {
+      const result = RNFS.downloadFile(options);
+      return {
+        jobId: result.jobId,
+        promise: result.promise
+      };
+    } catch (error) {
+      console.error("Download start error:", error);
+      throw error;
+    }
   },
 
   // حذف نموذج
