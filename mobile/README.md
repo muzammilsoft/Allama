@@ -12,10 +12,14 @@ The official React Native application for the Allama project. This app allows yo
 ## 🚀 Installation
 
 ### 📦 Download APK
-You can download the latest generated APK from the **Releases** section of this repository (if available) or via **GitHub Actions Artifacts**:
+For maximum compatibility with all devices (including older Android versions and various processors), please use the **Universal APK**.
+
 1. Go to the [Actions](https://github.com/muzammilsoft/3allama/actions) tab.
 2. Select the latest successful **Build Android APK** run.
-3. Scroll down to **Artifacts** and download `Allama-Release-APK`.
+3. Scroll down to **Artifacts**.
+4. Download **`Allama-Universal-APK`** (Recommended).
+
+> **Note:** The Universal APK supports Android 9.0+ and works on both 32-bit and 64-bit ARM/x86 processors.
 
 ## 🛠️ Development
 

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, Alert, StatusBar } from 'react-native';
-import ProgressBar from '@react-native-community/progress-bar-android';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, Alert, StatusBar, Animated } from 'react-native';
 import { ChevronLeft, Download, Trash2, CheckCircle, MessageCircle } from 'lucide-react-native';
 import { ModelService, Model } from '../services/ModelService';
 import RNFS from 'react-native-fs';
@@ -114,12 +113,17 @@ const ModelManagerScreen = ({ navigation }: any) => {
               <Text style={[styles.progressText, {color: colors.text}]}>
                 {progress === -1 ? 'جاري التحميل...' : `${Math.round(progress)}%`}
               </Text>
-              <ProgressBar
-                styleAttr="Horizontal"
-                indeterminate={progress === -1}
-                progress={progress === -1 ? 0 : progress / 100}
-                color={colors.primary}
-              />
+              <View style={[styles.progressBarBg, { backgroundColor: isDark ? '#333' : '#eee' }]}>
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    {
+                      backgroundColor: colors.primary,
+                      width: progress === -1 ? '50%' : `${Math.max(0, Math.min(100, progress))}%`
+                    }
+                  ]}
+                />
+              </View>
               <TouchableOpacity onPress={() => {
                 if (currentJobId) RNFS.stopDownload(currentJobId);
               }}>
@@ -188,7 +192,9 @@ const styles = StyleSheet.create({
   infoBox: { padding: 16, margin: 16, borderRadius: 8 },
   infoText: { fontSize: 13, textAlign: 'center', fontFamily: 'Cairo-Medium' },
   progressContainer: { flex: 1, marginLeft: 16 },
-  progressText: { textAlign: 'center', fontSize: 12, fontFamily: 'Cairo-Regular' },
+  progressText: { textAlign: 'center', fontSize: 12, fontFamily: 'Cairo-Regular', marginBottom: 4 },
+  progressBarBg: { height: 6, borderRadius: 3, width: '100%', overflow: 'hidden' },
+  progressBarFill: { height: '100%', borderRadius: 3 },
   cancelText: { color: 'red', textAlign: 'center', marginTop: 4, fontSize: 12, fontFamily: 'Cairo-Bold' }
 });
 

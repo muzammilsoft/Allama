@@ -56,6 +56,13 @@ jobs:
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Allama-Release-APK
-          path: mobile/android/app/build/outputs/apk/release/*.apk
+          name: Allama-Universal-APK
+          path: mobile/android/app/build/outputs/apk/release/*universal*.apk
           retention-days: 7
+
+      - name: Upload All Variants (Backup)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Allama-All-Variants
+          path: mobile/android/app/build/outputs/apk/release/*.apk
+          retention-days: 3
