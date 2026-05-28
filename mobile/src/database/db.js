@@ -15,6 +15,11 @@ export const getSessions = async (db) => {
   return sessions;
 };
 export const createSession = async (db, id, title) => { await db.executeSql('INSERT INTO sessions (id, title) VALUES (?, ?)', [id, title]); };
+export const updateSessionTitle = async (db, id, title) => { await db.executeSql('UPDATE sessions SET title = ? WHERE id = ?', [title, id]); };
+export const deleteSession = async (db, id) => {
+  await db.executeSql('DELETE FROM messages WHERE sessionId = ?', [id]);
+  await db.executeSql('DELETE FROM sessions WHERE id = ?', [id]);
+};
 export const getMessages = async (db, sessionId) => {
   const results = await db.executeSql('SELECT * FROM messages WHERE sessionId = ? ORDER BY created_at ASC', [sessionId]);
   const messages = [];

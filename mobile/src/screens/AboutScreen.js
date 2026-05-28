@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Linking, ScrollView, StatusBar } from 'react-native';
-import { ChevronLeft, Github, Facebook, Mail } from 'lucide-react-native';
+import { ChevronLeft, Send, Globe, User, Info, Link as LinkIcon } from 'lucide-react-native';
 import { useTheme } from '../utils/ThemeContext';
 
 const AboutScreen = ({ navigation }) => {
@@ -12,39 +12,48 @@ const AboutScreen = ({ navigation }) => {
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <ChevronLeft size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, {color: colors.text}]}>عن المطور</Text>
+        <Text style={[styles.headerTitle, {color: colors.text}]}>عن التطبيق والمطور</Text>
         <View style={{ width: 24 }} />
       </View>
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.profileSection}>
-          <View style={[styles.avatar, {backgroundColor: colors.primary}]}>
-            <Text style={[styles.avatarText, {color: colors.primaryContrast}]}>M</Text>
+        <View style={styles.projectSection}>
+          <View style={[styles.projectIcon, {backgroundColor: colors.primary}]}>
+            <Text style={[styles.projectIconText, {color: colors.primaryContrast}]}>؏</Text>
           </View>
-          <Text style={[styles.name, {color: colors.text}]}>muzammilsoft</Text>
-          <Text style={[styles.bio, {color: colors.textSecondary}]}>مطور تطبيقات وتطبيقات ويب</Text>
+          <Text style={[styles.projectName, {color: colors.text}]}>علّامة (Allama)</Text>
+          <Text style={[styles.projectDesc, {color: colors.text}]}>
+            علّامة واجهة استخدام لنماذج الذكاء الاصطناعي بدون اتصال انترنت للهاتف باعتمادها على Ollama، المشروع مفتوح المصدر و يمكن للجميع المساهمة في تطويره.
+          </Text>
+        </View>
+
+        <View style={[styles.divider, {backgroundColor: colors.border}]} />
+
+        <View style={styles.profileSection}>
+          <User size={40} color={colors.primary} />
+          <Text style={[styles.name, {color: colors.text}]}>المطور: KG</Text>
+          <Text style={[styles.bio, {color: colors.textSecondary}]}>مطور تطبيقات و تطبيقات ويب مهتم بأتمتة الذكاء الاصطناعي.</Text>
         </View>
 
         <View style={styles.infoSection}>
           <Text style={[styles.sectionTitle, {color: colors.text}]}>تواصل معي</Text>
 
-          <TouchableOpacity style={[styles.linkItem, {borderBottomColor: colors.border}]} onPress={() => Linking.openURL('https://github.com/muzammilsoft')}>
-            <Github size={20} color={colors.text} />
-            <Text style={[styles.linkText, {color: colors.text}]}>GitHub: muzammilsoft</Text>
-          </TouchableOpacity>
+          <View style={styles.socialRow}>
+            <TouchableOpacity style={[styles.socialIcon, {backgroundColor: colors.surface}]} onPress={() => Linking.openURL('https://github.com/muzammilsoft')}>
+              <LinkIcon size={24} color={colors.text} />
+            </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.linkItem, {borderBottomColor: colors.border}]} onPress={() => Linking.openURL('https://facebook.com/khartoum.ghoul')}>
-            <Facebook size={20} color="#1877F2" />
-            <Text style={[styles.linkText, {color: colors.text}]}>Facebook: khartoum.ghoul</Text>
-          </TouchableOpacity>
+            <TouchableOpacity style={[styles.socialIcon, {backgroundColor: colors.surface}]} onPress={() => Linking.openURL('https://www.facebook.com/khartoum.ghoul')}>
+              <LinkIcon size={24} color="#1877F2" />
+            </TouchableOpacity>
 
-          <View style={[styles.linkItem, {borderBottomColor: colors.border}]}>
-            <Mail size={20} color={colors.textSecondary} />
-            <Text style={[styles.linkText, {color: colors.textSecondary}]}>muzammil@example.com</Text>
+            <TouchableOpacity style={[styles.socialIcon, {backgroundColor: colors.surface}]} onPress={() => Linking.openURL('https://t.me/khartoumGhoul')}>
+              <Send size={24} color="#0088cc" />
+            </TouchableOpacity>
           </View>
         </View>
 
         <View style={styles.footer}>
-          <Text style={[styles.footerText, {color: colors.textSecondary}]}>علّامة v1.3.0</Text>
+          <Text style={[styles.footerText, {color: colors.textSecondary}]}>علّامة v1.4.0</Text>
           <Text style={[styles.footerSubText, {color: colors.textSecondary, opacity: 0.6}]}>صنع بحب لتسهيل استخدام الذكاء الاصطناعي</Text>
         </View>
       </ScrollView>
@@ -57,15 +66,19 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1 },
   headerTitle: { fontSize: 20, fontFamily: 'Cairo-Bold' },
   content: { padding: 24, alignItems: 'center' },
-  profileSection: { alignItems: 'center', marginBottom: 40 },
-  avatar: { width: 100, height: 100, borderRadius: 50, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
-  avatarText: { fontSize: 40, fontFamily: 'Cairo-Bold' },
-  name: { fontSize: 24, marginBottom: 8, fontFamily: 'Cairo-Bold' },
-  bio: { fontSize: 16, textAlign: 'center', fontFamily: 'Cairo-Regular' },
+  projectSection: { alignItems: 'center', marginBottom: 20 },
+  projectIcon: { width: 80, height: 80, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+  projectIconText: { fontSize: 40, fontFamily: 'Cairo-Bold' },
+  projectName: { fontSize: 22, marginBottom: 8, fontFamily: 'Cairo-Bold' },
+  projectDesc: { fontSize: 14, textAlign: 'center', fontFamily: 'Cairo-Regular', lineHeight: 22 },
+  divider: { width: '100%', height: 1, marginVertical: 24 },
+  profileSection: { alignItems: 'center', marginBottom: 30 },
+  name: { fontSize: 20, marginTop: 10, marginBottom: 8, fontFamily: 'Cairo-Bold' },
+  bio: { fontSize: 14, textAlign: 'center', fontFamily: 'Cairo-Regular', paddingHorizontal: 10 },
   infoSection: { width: '100%', marginBottom: 40 },
-  sectionTitle: { fontSize: 18, marginBottom: 16, textAlign: 'right', fontFamily: 'Cairo-Bold' },
-  linkItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1 },
-  linkText: { fontSize: 16, marginLeft: 12, fontFamily: 'Cairo-Medium' },
+  sectionTitle: { fontSize: 18, marginBottom: 20, textAlign: 'center', fontFamily: 'Cairo-Bold' },
+  socialRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+  socialIcon: { width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center', marginHorizontal: 15, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 1.41 },
   footer: { alignItems: 'center', marginTop: 20 },
   footerText: { fontSize: 14, fontFamily: 'Cairo-Bold' },
   footerSubText: { fontSize: 12, marginTop: 4, fontFamily: 'Cairo-Regular' }

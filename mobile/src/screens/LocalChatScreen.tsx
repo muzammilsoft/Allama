@@ -1,17 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, Alert, AppState, StatusBar } from 'react-native';
-import { ChevronLeft, Send, User, Bot, Trash2 } from 'lucide-react-native';
+import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, Alert, AppState, StatusBar, Image } from 'react-native';
+import { ChevronLeft, Send, User, Bot, Trash2, Paperclip, X } from 'lucide-react-native';
 import { initLlama, LlamaContext } from 'llama.rn';
 import { ModelService } from '../services/ModelService';
 import Markdown from 'react-native-markdown-display';
 import { generateId } from '../utils/utils';
 import { useTheme } from '../utils/ThemeContext';
+import { launchImageLibrary } from 'react-native-image-picker';
 
 const LocalChatScreen = ({ route, navigation }: any) => {
   const { colors, isDark } = useTheme();
   const { modelFile } = route.params;
   const [messages, setMessages] = useState<any[]>([]);
   const [inputText, setInputText] = useState('');
+  const [selectedImage, setSelectedImage] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [isLlamaReady, setIsLlamaReady] = useState(false);
   const [speed, setSpeed] = useState<number | null>(null);
@@ -68,12 +70,31 @@ const LocalChatScreen = ({ route, navigation }: any) => {
     }
   };
 
-  const sendMessage = async () => {
-    if (!inputText.trim() || !isLlamaReady || loading) return;
+  const pickImage = () => {
+    launchImageLibrary({ mediaType: 'photo', includeBase64: true }, (response) => {
+      if (response.didCancel || response.errorCode) return;
+      if (response.assets && response.assets.length > 0) {
+        setSelectedImage(response.assets[0]);
+      }
+    });
+  };
 
-    const userMsg = { id: generateId(), role: 'user', content: inputText };
+  const sendMessage = async () => {
+    if ((!inputText.trim() && !selectedImage) || !isLlamaReady || loading) return;
+
+    const userMsg = {
+      id: generateId(),
+      role: 'user',
+      content: inputText,
+      image: selectedImage ? selectedImage.uri : null
+    };
+
     setMessages(prev => [...prev, userMsg]);
+    const currentInput = inputText;
+    const currentImage = selectedImage;
+
     setInputText('');
+    setSelectedImage(null);
     setLoading(true);
     setSpeed(null);
 
@@ -87,14 +108,24 @@ const LocalChatScreen = ({ route, navigation }: any) => {
 
       const prompt = messages.slice(-4).map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`).join('\n') + `\nUser: ${inputText}\nAssistant:`;
 
+      const completionParams: any = {
+        prompt: prompt,
+        n_predict: 512,
+        temperature: 0.7,
+        top_p: 0.9,
+        stop: ['User:', '\nAssistant:', '</s>'],
+      };
+
+      if (currentImage && currentImage.uri) {
+        let imagePath = currentImage.uri;
+        if (imagePath.startsWith('file://')) {
+          imagePath = imagePath.slice(7);
+        }
+        completionParams.media_paths = [imagePath];
+      }
+
       await contextRef.current?.completion(
-        {
-          prompt: prompt,
-          n_predict: 512,
-          temperature: 0.7,
-          top_p: 0.9,
-          stop: ['User:', '\nAssistant:', '</s>'],
-        },
+        completionParams,
         (data) => {
           tokenCount++;
           assistantMsgContent += data.token;
@@ -130,6 +161,7 @@ const LocalChatScreen = ({ route, navigation }: any) => {
         {item.role === 'user' ? <User size={16} color={colors.textSecondary} /> : <Bot size={16} color={colors.primary} />}
         <Text style={[styles.roleText, {color: colors.textSecondary}]}>{item.role === 'user' ? 'أنت' : 'علّامة (محلي)'}</Text>
       </View>
+      {item.image && <Image source={{ uri: item.image }} style={styles.messageImage} resizeMode="contain" />}
       <Markdown style={getMarkdownStyles(colors)}>{item.content}</Markdown>
     </View>
   );
@@ -171,7 +203,19 @@ const LocalChatScreen = ({ route, navigation }: any) => {
         </View>
       )}
 
+      {selectedImage && (
+        <View style={[styles.imagePreviewContainer, {backgroundColor: colors.surface, borderTopColor: colors.border}]}>
+          <Image source={{ uri: selectedImage.uri }} style={styles.imagePreview} />
+          <TouchableOpacity style={styles.removeImageBtn} onPress={() => setSelectedImage(null)}>
+            <X size={16} color="white" />
+          </TouchableOpacity>
+        </View>
+      )}
+
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={[styles.inputContainer, {borderTopColor: colors.border}]}>
+        <TouchableOpacity style={styles.iconBtn} onPress={pickImage} disabled={!isLlamaReady || loading}>
+          <Paperclip size={24} color={colors.textSecondary} />
+        </TouchableOpacity>
         <TextInput
           style={[styles.input, {color: colors.text}]}
           value={inputText}
@@ -182,9 +226,9 @@ const LocalChatScreen = ({ route, navigation }: any) => {
           editable={isLlamaReady && !loading}
         />
         <TouchableOpacity
-          style={[styles.sendBtn, {backgroundColor: colors.primary}, (!inputText.trim() || !isLlamaReady || loading) && {backgroundColor: colors.border}]}
+          style={[styles.sendBtn, {backgroundColor: colors.primary}, (!inputText.trim() && !selectedImage || !isLlamaReady || loading) && {backgroundColor: colors.border}]}
           onPress={sendMessage}
-          disabled={!inputText.trim() || !isLlamaReady || loading}
+          disabled={(!inputText.trim() && !selectedImage) || !isLlamaReady || loading}
         >
           <Send size={20} color={colors.primaryContrast} />
         </TouchableOpacity>
@@ -204,8 +248,13 @@ const styles = StyleSheet.create({
   userBubble: { alignSelf: 'flex-start' },
   assistantBubble: { alignSelf: 'flex-end', borderWidth: 1 },
   messageHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  messageImage: { width: '100%', height: 200, borderRadius: 8, marginBottom: 8 },
   roleText: { fontSize: 12, marginHorizontal: 4, fontFamily: 'Cairo-Medium' },
+  imagePreviewContainer: { padding: 10, flexDirection: 'row', alignItems: 'center', borderTopWidth: 1 },
+  imagePreview: { width: 60, height: 60, borderRadius: 8 },
+  removeImageBtn: { position: 'absolute', top: 5, right: 5, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 10, padding: 2 },
   inputContainer: { flexDirection: 'row', alignItems: 'center', padding: 8, borderTopWidth: 1 },
+  iconBtn: { padding: 8 },
   input: { flex: 1, paddingHorizontal: 12, paddingVertical: 8, fontSize: 16, textAlign: 'right', fontFamily: 'Cairo-Regular' },
   sendBtn: { padding: 10, borderRadius: 20 },
   loadingOverlay: { position: 'absolute', top: 100, left: 0, right: 0, alignItems: 'center', zIndex: 10 },
