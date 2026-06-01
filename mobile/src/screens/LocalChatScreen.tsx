@@ -106,14 +106,16 @@ const LocalChatScreen = ({ route, navigation }: any) => {
 
       setMessages(prev => [...prev, { id: assistantId, role: 'assistant', content: '' }]);
 
-      const prompt = messages.slice(-4).map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`).join('\n') + `\nUser: ${inputText}\nAssistant:`;
+      const historyMessages = messages.slice(-6).map(m => ({
+        role: m.role,
+        content: m.content
+      }));
 
       const completionParams: any = {
-        prompt: prompt,
+        messages: [...historyMessages, { role: 'user', content: inputText }],
         n_predict: 512,
         temperature: 0.7,
         top_p: 0.9,
-        stop: ['User:', '\nAssistant:', '</s>'],
       };
 
       if (currentImage && currentImage.uri) {

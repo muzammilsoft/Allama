@@ -19,7 +19,7 @@
     "axios": "^1.16.1",
     "highlight.js": "^11.11.1",
     "llama.rn": "^0.9.3",
-    "lucide-react-native": "^1.16.0",
+    "lucide-react-native": "^1.17.0",
     "react": "18.3.1",
     "react-native": "0.76.3",
     "react-native-blob-util": "^0.24.8",
@@ -34,7 +34,8 @@
     "react-native-safe-area-context": "^4.12.0",
     "react-native-screens": "3.34.0",
     "react-native-sqlite-storage": "^6.0.1",
-    "react-native-svg": "^15.15.5"
+    "react-native-svg": "^15.15.5",
+    "text-encoding-polyfill": "^0.6.7"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

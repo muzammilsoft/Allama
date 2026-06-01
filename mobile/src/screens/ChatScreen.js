@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, DrawerLayoutAndroid, Modal, ToastAndroid, StatusBar, Image, Alert } from 'react-native';
-import { Menu, Send, Paperclip, Settings, Plus, User, Bot, Info, Cpu, X } from 'lucide-react-native';
+import 'text-encoding-polyfill';
+import { Menu, Send, Paperclip, Settings, Plus, User, Bot, Info, Cpu, X, HelpCircle } from 'lucide-react-native';
 import * as db from '../database/db';
 import * as ollama from '../api/ollama';
 import Markdown from 'react-native-markdown-display';
@@ -76,7 +77,6 @@ const ChatScreen = ({ navigation }) => {
   const handleLongPressSession = (session) => {
     setSessionToEdit(session);
     setNewSessionTitle(session.title);
-    // Use a small delay to ensure drawer doesn't get stuck during transition
     drawer.current?.closeDrawer();
     setTimeout(() => setShowSessionModal(true), 200);
   };
@@ -177,26 +177,55 @@ const ChatScreen = ({ navigation }) => {
     await db.addMessage(conn, userMsg.id, userMsg.sessionId, userMsg.role, userMsg.content, userMsg.image ? [userMsg.image] : null);
 
     try {
-      // Map local message format to Ollama API format
       const chatHistory = messages.concat(userMsg).map(m => {
         const msgObj = { role: m.role, content: m.content };
-
-        // If it's the current user message being sent, we have the base64 from currentImage
         if (m.id === userMsg.id && currentImage && currentImage.base64) {
           msgObj.images = [currentImage.base64];
         }
-        // Historical messages might have images saved in DB as URIs,
-        // but Ollama API needs base64 every time for stateless chat?
-        // Actually Ollama remembers context if we use the session, but we are sending history.
-        // For now, only the current message's image is sent to the API.
-
         return msgObj;
       });
 
-      const response = await ollama.chat(selectedModel, chatHistory);
-      const assistantMsg = { id: generateId(), sessionId: currentSessionId, role: 'assistant', content: response.data.message.content };
+      const assistantId = generateId();
+      let assistantContent = "";
+      const assistantMsg = { id: assistantId, sessionId: currentSessionId, role: 'assistant', content: "" };
       setMessages(prev => [...prev, assistantMsg]);
-      await db.addMessage(conn, assistantMsg.id, assistantMsg.sessionId, assistantMsg.role, assistantMsg.content);
+
+      let leftover = '';
+      const response = await ollama.chat(selectedModel, chatHistory, {}, [], true, (chunk) => {
+        const chunkStr = typeof chunk === 'string' ? chunk : String.fromCharCode.apply(null, chunk);
+        const lines = (leftover + chunkStr).split('\n');
+        leftover = lines.pop();
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const json = JSON.parse(line);
+            if (json.message && json.message.content) {
+              assistantContent += json.message.content;
+              setMessages(prev => prev.map(m =>
+                m.id === assistantId ? { ...m, content: assistantContent } : m
+              ));
+            }
+          } catch (err) {
+            // Partial JSON or other error
+          }
+        }
+      });
+
+      // Handle remaining bit
+      if (leftover.trim()) {
+        try {
+          const json = JSON.parse(leftover);
+          if (json.message && json.message.content) {
+            assistantContent += json.message.content;
+            setMessages(prev => prev.map(m =>
+              m.id === assistantId ? { ...m, content: assistantContent } : m
+            ));
+          }
+        } catch (e) {}
+      }
+
+      await db.addMessage(conn, assistantId, currentSessionId, 'assistant', assistantContent);
     } catch (e) {
       const errorMsg = { id: generateId(), sessionId: currentSessionId, role: 'assistant', content: "عذراً، حدث خطأ أثناء الاتصال بـ Ollama." };
       setMessages(prev => [...prev, errorMsg]);
@@ -242,6 +271,9 @@ const ChatScreen = ({ navigation }) => {
       )} />
       <TouchableOpacity style={[styles.settingsBtn, {borderTopColor: colors.border}]} onPress={() => { drawer.current?.closeDrawer(); navigation.navigate('ModelManager'); }}>
         <Cpu size={20} color={colors.text} /><Text style={[styles.settingsBtnText, {color: colors.text}]}>الذكاء الاصطناعي المحلي (Off-line)</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.settingsBtn} onPress={() => { drawer.current?.closeDrawer(); navigation.navigate('Guide'); }}>
+        <HelpCircle size={20} color={colors.text} /><Text style={[styles.settingsBtnText, {color: colors.text}]}>دليل التشغيل</Text>
       </TouchableOpacity>
       <TouchableOpacity style={styles.settingsBtn} onPress={() => { drawer.current?.closeDrawer(); navigation.navigate('About'); }}>
         <Info size={20} color={colors.text} /><Text style={[styles.settingsBtnText, {color: colors.text}]}>عن المطور</Text>

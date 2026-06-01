@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Linking, ScrollView, StatusBar } from 'react-native';
-import { ChevronLeft, Send, Globe, User, Info, Link as LinkIcon } from 'lucide-react-native';
+import { ChevronLeft, Send, Globe, User, Info, Link } from 'lucide-react-native';
 import { useTheme } from '../utils/ThemeContext';
 
 const AboutScreen = ({ navigation }) => {
@@ -39,11 +39,11 @@ const AboutScreen = ({ navigation }) => {
 
           <View style={styles.socialRow}>
             <TouchableOpacity style={[styles.socialIcon, {backgroundColor: colors.surface}]} onPress={() => Linking.openURL('https://github.com/muzammilsoft')}>
-              <LinkIcon size={24} color={colors.text} />
+              <Link size={24} color={colors.text} />
             </TouchableOpacity>
 
-            <TouchableOpacity style={[styles.socialIcon, {backgroundColor: colors.surface}]} onPress={() => Linking.openURL('https://www.facebook.com/khartoum.ghoul')}>
-              <LinkIcon size={24} color="#1877F2" />
+            <TouchableOpacity style={[styles.socialIcon, {backgroundColor: colors.surface}]} onPress={() => Linking.openURL('https://www.facebook.com/khartoum.ghoul.alt')}>
+              <Link size={24} color="#1877F2" />
             </TouchableOpacity>
 
             <TouchableOpacity style={[styles.socialIcon, {backgroundColor: colors.surface}]} onPress={() => Linking.openURL('https://t.me/khartoumGhoul')}>
