@@ -7,17 +7,21 @@ import { useTheme } from '../utils/ThemeContext';
 const SettingsScreen = ({ navigation }) => {
   const { colors, toggleTheme, theme, isDark } = useTheme();
   const [ollamaUrl, setOllamaUrl] = useState('');
+  const [useStreaming, setUseStreaming] = useState(true);
 
   useEffect(() => { loadSettings(); }, []);
 
   const loadSettings = async () => {
     const url = await AsyncStorage.getItem('ollama_url');
+    const streaming = await AsyncStorage.getItem('use_streaming');
     setOllamaUrl(url || 'http://localhost:11434');
+    setUseStreaming(streaming === null ? true : streaming === 'true');
   };
 
   const saveSettings = async () => {
     try {
       await AsyncStorage.setItem('ollama_url', ollamaUrl);
+      await AsyncStorage.setItem('use_streaming', useStreaming.toString());
       Alert.alert('تم الحفظ', 'تم حفظ الإعدادات بنجاح');
     }
     catch (e) { Alert.alert('خطأ', 'فشل حفظ الإعدادات'); }
@@ -53,6 +57,18 @@ const SettingsScreen = ({ navigation }) => {
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, {color: colors.text}]}>إعدادات الخادم</Text>
+
+          <View style={[styles.settingRow, {backgroundColor: colors.surface, marginBottom: 16}]}>
+            <View style={styles.settingLabelGroup}>
+              <Text style={[styles.settingLabel, {color: colors.text}]}>استخدام الـ Stream</Text>
+            </View>
+            <Switch
+              value={useStreaming}
+              onValueChange={setUseStreaming}
+              trackColor={{ false: '#ccc', true: colors.primary }}
+            />
+          </View>
+
           <Text style={[styles.label, {color: colors.textSecondary}]}>رابط خادم Ollama</Text>
           <TextInput
             style={[styles.input, {color: colors.text, borderColor: colors.border, backgroundColor: colors.surface}]}

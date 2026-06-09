@@ -4,6 +4,7 @@ import 'text-encoding-polyfill';
 import { Menu, Send, Paperclip, Settings, Plus, User, Bot, Info, Cpu, X, HelpCircle } from 'lucide-react-native';
 import * as db from '../database/db';
 import * as ollama from '../api/ollama';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Markdown from 'react-native-markdown-display';
 import { generateId } from '../utils/utils';
 import { getDBConnection } from '../database/db';
@@ -185,49 +186,56 @@ const ChatScreen = ({ navigation }) => {
         return msgObj;
       });
 
+      const streamingSetting = await AsyncStorage.getItem('use_streaming');
+      const useStreaming = streamingSetting === null ? true : streamingSetting === 'true';
+
       const assistantId = generateId();
       let assistantContent = "";
-      const assistantMsg = { id: assistantId, sessionId: currentSessionId, role: 'assistant', content: "" };
-      setMessages(prev => [...prev, assistantMsg]);
 
-      let leftover = '';
-      const response = await ollama.chat(selectedModel, chatHistory, {}, [], true, (chunk) => {
-        const chunkStr = typeof chunk === 'string' ? chunk : String.fromCharCode.apply(null, chunk);
-        const lines = (leftover + chunkStr).split('\n');
-        leftover = lines.pop();
+      if (useStreaming) {
+        const assistantMsg = { id: assistantId, sessionId: currentSessionId, role: 'assistant', content: "" };
+        setMessages(prev => [...prev, assistantMsg]);
 
-        for (const line of lines) {
-          if (!line.trim()) continue;
+        let leftover = '';
+        await ollama.chat(selectedModel, chatHistory, {}, [], true, (chunk) => {
+          const chunkStr = typeof chunk === 'string' ? chunk : String.fromCharCode.apply(null, chunk);
+          const lines = (leftover + chunkStr).split('\n');
+          leftover = lines.pop();
+
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const json = JSON.parse(line);
+              if (json.message && json.message.content) {
+                assistantContent += json.message.content;
+                setMessages(prev => prev.map(m =>
+                  m.id === assistantId ? { ...m, content: assistantContent } : m
+                ));
+              }
+            } catch (err) {}
+          }
+        });
+
+        if (leftover.trim()) {
           try {
-            const json = JSON.parse(line);
+            const json = JSON.parse(leftover);
             if (json.message && json.message.content) {
               assistantContent += json.message.content;
-              setMessages(prev => prev.map(m =>
-                m.id === assistantId ? { ...m, content: assistantContent } : m
-              ));
+              setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: assistantContent } : m));
             }
-          } catch (err) {
-            // Partial JSON or other error
-          }
+          } catch (e) {}
         }
-      });
-
-      // Handle remaining bit
-      if (leftover.trim()) {
-        try {
-          const json = JSON.parse(leftover);
-          if (json.message && json.message.content) {
-            assistantContent += json.message.content;
-            setMessages(prev => prev.map(m =>
-              m.id === assistantId ? { ...m, content: assistantContent } : m
-            ));
-          }
-        } catch (e) {}
+      } else {
+        const response = await ollama.chat(selectedModel, chatHistory, {}, [], false);
+        assistantContent = response.data.message.content;
+        const assistantMsg = { id: assistantId, sessionId: currentSessionId, role: 'assistant', content: assistantContent };
+        setMessages(prev => [...prev, assistantMsg]);
       }
 
       await db.addMessage(conn, assistantId, currentSessionId, 'assistant', assistantContent);
     } catch (e) {
-      const errorMsg = { id: generateId(), sessionId: currentSessionId, role: 'assistant', content: "عذراً، حدث خطأ أثناء الاتصال بـ Ollama." };
+      console.error("Chat Error:", e);
+      const errorMsg = { id: generateId(), sessionId: currentSessionId, role: 'assistant', content: "عذراً، حدث خطأ أثناء الاتصال بـ Ollama. تأكد من تشغيل السيرفر وصحة الرابط." };
       setMessages(prev => [...prev, errorMsg]);
     } finally { setLoading(false); }
   };
