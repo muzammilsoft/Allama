@@ -12,19 +12,43 @@ export const chat = async (model, messages, options = {}, tools = [], stream = f
   const payload = { model, messages, options, stream };
   if (tools && tools.length > 0) payload.tools = tools;
 
+  console.log(`Sending request to: ${baseUrl}/api/chat`, JSON.stringify(payload));
+
   if (stream) {
-    return ReactNativeBlobUtil.config({
-      fileCache: false,
-    }).fetch('POST', `${baseUrl}/api/chat`, {
-      'Content-Type': 'application/json',
-    }, JSON.stringify(payload))
-    .progress({ interval: 10 }, (received, total) => {
-      // Progress can be used for byte monitoring
-    })
-    .onData((chunk) => {
-      if (onChunk) onChunk(chunk);
-    });
+    try {
+      const res = await ReactNativeBlobUtil.config({
+        fileCache: false,
+        timeout: 30000,
+      }).fetch('POST', `${baseUrl}/api/chat`, {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      }, JSON.stringify(payload))
+      .progress({ interval: 10 }, (received, total) => {
+        // Progress monitoring
+      })
+      .onData((chunk) => {
+        if (onChunk) onChunk(chunk);
+      });
+
+      const status = res.info().status;
+      if (status !== 200) {
+        console.error(`Ollama stream error: Status ${status}`, res.data);
+        throw new Error(`Ollama Error (${status}): ${res.data || 'No response data'}`);
+      }
+      return res;
+    } catch (err) {
+      console.error("ReactNativeBlobUtil error:", err);
+      throw err;
+    }
   }
 
-  return axios.post(`${baseUrl}/api/chat`, payload, { responseType: 'json', timeout: 0 });
+  try {
+    return await axios.post(`${baseUrl}/api/chat`, payload, {
+      responseType: 'json',
+      timeout: 30000
+    });
+  } catch (err) {
+    console.error("Axios chat error:", err);
+    throw err;
+  }
 };

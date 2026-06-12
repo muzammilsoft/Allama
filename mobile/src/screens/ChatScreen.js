@@ -235,7 +235,20 @@ const ChatScreen = ({ navigation }) => {
       await db.addMessage(conn, assistantId, currentSessionId, 'assistant', assistantContent);
     } catch (e) {
       console.error("Chat Error:", e);
-      const errorMsg = { id: generateId(), sessionId: currentSessionId, role: 'assistant', content: "عذراً، حدث خطأ أثناء الاتصال بـ Ollama. تأكد من تشغيل السيرفر وصحة الرابط." };
+      let detailedError = "عذراً، حدث خطأ أثناء الاتصال بـ Ollama. تأكد من تشغيل السيرفر وصحة الرابط.\n\n";
+
+      if (e.message) {
+        detailedError += `**خطأ:** ${e.message}\n`;
+      }
+
+      if (e.response) {
+        detailedError += `**الحالة:** ${e.response.status}\n`;
+        detailedError += `**التفاصيل:** ${JSON.stringify(e.response.data)}\n`;
+      } else if (e.stack) {
+        detailedError += `**المسار (Stack):**\n\`\`\`\n${e.stack}\n\`\`\``;
+      }
+
+      const errorMsg = { id: generateId(), sessionId: currentSessionId, role: 'assistant', content: detailedError };
       setMessages(prev => [...prev, errorMsg]);
     } finally { setLoading(false); }
   };
